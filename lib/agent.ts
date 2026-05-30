@@ -1,6 +1,16 @@
 import { RealtimeAgent, tool } from "@openai/agents-realtime";
 import { z } from "zod";
 import { useCanvasStore } from "./store";
+import {
+  CELL_FLASH_MS,
+  ROW_OP_TOTAL_MS,
+  HIGHLIGHT_HOLD_MS,
+} from "./animation";
+
+// Espera lo que dura la animación antes de devolver el output al modelo: el SDK
+// hace await del execute() de la tool antes de pedir la siguiente narración, así
+// que esto intercala voz y animación paso a paso.
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const idField = z
   .string()
@@ -294,7 +304,8 @@ const resaltarTabla = tool({
         color: r.color ?? "amber",
       })),
     );
-    return "Tabla resaltada.";
+    await sleep(HIGHLIGHT_HOLD_MS);
+    return "Resaltado aplicado. Di la siguiente micro-frase y luego llama UNA sola herramienta de tabla.";
   },
 });
 
@@ -316,7 +327,8 @@ const actualizarCeldaTabla = tool({
   }),
   execute: async ({ id, cambios }) => {
     useCanvasStore.getState().setTableCells(id, cambios);
-    return "Celdas actualizadas.";
+    await sleep(CELL_FLASH_MS);
+    return "Celda(s) actualizada(s). Di la siguiente micro-frase y luego llama UNA sola herramienta de tabla.";
   },
 });
 
@@ -335,7 +347,8 @@ const operarFilasTool = tool({
   }),
   execute: async ({ id, origen, destino, etiqueta, nuevos_valores }) => {
     useCanvasStore.getState().operarFilas(id, origen, destino, etiqueta, nuevos_valores);
-    return "Operación entre filas animada.";
+    await sleep(ROW_OP_TOTAL_MS);
+    return "Operación animada. Di la siguiente micro-frase y luego llama UNA sola herramienta de tabla.";
   },
 });
 
@@ -454,7 +467,13 @@ Cómo enseñar bien:
    - aclarar_concepto: para una DUDA RÁPIDA sobre un término (ej. '¿qué es H2O?'), NO crees una tarjeta nueva: ancla una aclaración ligera (popup) a un elemento que YA exista en el canvas. Reserva crear_tarjeta para ideas que merezcan su propio nodo en el mapa.
 2. CONECTA las ideas: usa 'conectar' para enlazar elementos relacionados y formar un mapa conceptual (ej. conectar 'sol' con 'evaporacion' con etiqueta 'provoca'). No dejes los recursos sueltos; muestra cómo se relacionan.
 3. SEÑALA mientras hablas: cuando te refieras a un elemento ya creado, llama a 'resaltar' con su id para que la cámara se centre en él, como apuntar a la pizarra.
-   - Con TABLAS, anímalas paso a paso mientras explicas: 'resaltar_tabla' para destacar filas/columnas/celdas (avanza llamándola de nuevo; lista vacía para limpiar), 'actualizar_celda_tabla' para rellenar o corregir valores con parpadeo, y 'operar_filas' para mostrar una operación entre filas (la origen se desliza sobre la destino). Usa los índices 0-based.
+   - Con TABLAS, sigue SIEMPRE este micro-bucle, una cosa a la vez:
+     1) Di EN VOZ una frase corta del ÚNICO paso que harás ahora (ej. "sumamos A1 más B1").
+     2) Llama a EXACTAMENTE UNA herramienta de tabla para animar ese paso ('resaltar_tabla', 'actualizar_celda_tabla' u 'operar_filas').
+     3) Espera el resultado de la herramienta (la animación tarda un momento).
+     4) Repite: siguiente micro-frase, luego UNA herramienta.
+     REGLA DURA: NUNCA encadenes varias herramientas de tabla seguidas sin hablar entre una y otra. Una frase ↔ una animación ↔ una herramienta. Si hay 3 cambios, son 3 micro-frases y 3 llamadas separadas, nunca una sola con todo.
+     Recordatorio: 'resaltar_tabla' apunta a filas/columnas/celdas (avanza llamándola otra vez; lista vacía = limpiar), 'actualizar_celda_tabla' rellena/corrige un valor con parpadeo, 'operar_filas' anima una operación entre dos filas. Índices 0-based.
 4. COMPRUEBA la comprensión: de vez en cuando usa 'crear_quiz' con una pregunta de opción múltiple, pregúntasela al estudiante EN VOZ ALTA y espera su respuesta hablada. Cuando responda, llama a 'revelar_respuesta' con el id del quiz y dale feedback breve (acertó o no, y por qué).
 5. Habla de forma cálida, clara y BREVE (1-2 frases por turno). El detalle va en el canvas, no en tu voz.
 6. Si el estudiante no propone tema, pregúntale qué quiere aprender y a qué nivel.

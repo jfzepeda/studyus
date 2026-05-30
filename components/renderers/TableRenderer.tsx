@@ -6,6 +6,7 @@ import {
   type TableElement,
   type TableHighlightColor,
 } from "@/lib/store";
+import { CELL_FLASH_MS, ROW_SLIDE_MS, ROW_OP_TOTAL_MS } from "@/lib/animation";
 
 const HL_BG: Record<TableHighlightColor, string> = {
   amber: "bg-amber-400/25",
@@ -44,7 +45,7 @@ export function TableRenderer({ table }: { table: TableElement }) {
         keys.forEach((k) => next.delete(k));
         return next;
       });
-    }, 600);
+    }, CELL_FLASH_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table.flashTick]);
@@ -77,7 +78,7 @@ export function TableRenderer({ table }: { table: TableElement }) {
           // Parpadea la fila destino (ya tiene los valores nuevos).
           const keys = (rows[target] ?? []).map((_, j) => `${target}-${j}`);
           setFlashing((prev) => new Set([...prev, ...keys]));
-        }, 1200),
+        }, ROW_SLIDE_MS),
       );
       timers.push(
         window.setTimeout(() => {
@@ -88,10 +89,10 @@ export function TableRenderer({ table }: { table: TableElement }) {
             return next;
           });
           setOpHl(null);
-        }, 1800),
+        }, ROW_OP_TOTAL_MS),
       );
     } else {
-      timers.push(window.setTimeout(() => setOpHl(null), 1800));
+      timers.push(window.setTimeout(() => setOpHl(null), ROW_OP_TOTAL_MS));
     }
 
     return () => timers.forEach((t) => clearTimeout(t));
@@ -143,7 +144,7 @@ export function TableRenderer({ table }: { table: TableElement }) {
                 width: slide.width,
                 height: slide.height,
                 "--slide-dy": `${slide.dy}px`,
-                animation: "rowSlideDown 1.2s cubic-bezier(.4,0,.2,1) forwards",
+                animation: `rowSlideDown ${ROW_SLIDE_MS}ms cubic-bezier(.4,0,.2,1) forwards`,
               } as CSSProperties
             }
           >
