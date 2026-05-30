@@ -61,3 +61,16 @@ body {
   height: auto;
   max-height: 320px;
 }
+
+/* Parpadeo de una celda de tabla cuando el asistente cambia su valor */
+@keyframes cellFlash {
+  0%, 100% { font-weight: 400; transform: scale(1); }
+  50% { font-weight: 800; color: #818cf8; transform: scale(1.12); }
+}
+.cell-flash { animation: cellFlash 0.6s ease; }
+
+/* Deslizamiento del overlay de una fila sobre otra (operación entre filas) */
+@keyframes rowSlideDown {
+  from { transform: translateY(0); opacity: 0.9; }
+  to { transform: translateY(var(--slide-dy, 0px)); opacity: 0.5; }
+}

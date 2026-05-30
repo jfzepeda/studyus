@@ -28,9 +28,15 @@ import { DrawingRenderer } from "./renderers/DrawingRenderer";
 import { FormulaRenderer } from "./renderers/FormulaRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
 import { QuizRenderer } from "./renderers/QuizRenderer";
+import { TableRenderer } from "./renderers/TableRenderer";
 
 const NODE_W = 340;
+const TABLE_NODE_W = 560;
 const FALLBACK_H = 200;
+
+function widthForKind(el: CanvasElement) {
+  return el.kind === "table" ? TABLE_NODE_W : NODE_W;
+}
 
 function renderBody(el: CanvasElement) {
   switch (el.kind) {
@@ -48,6 +54,8 @@ function renderBody(el: CanvasElement) {
       return <ImageRenderer src={el.src} titulo={el.titulo} loading={el.loading} />;
     case "quiz":
       return <QuizRenderer quiz={el} />;
+    case "table":
+      return <TableRenderer table={el} />;
   }
 }
 
@@ -59,7 +67,7 @@ function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   const el = data.el;
   return (
     <div
-      style={{ width: NODE_W }}
+      style={{ width: widthForKind(el) }}
       className={`rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
         highlighted
           ? "border-indigo-400 ring-2 ring-indigo-400/70 shadow-indigo-500/30"
@@ -84,7 +92,7 @@ function getLayouted(nodes: ResourceNode[], edges: Edge[]): ResourceNode[] {
   g.setDefaultEdgeLabel(() => ({}));
   nodes.forEach((n) =>
     g.setNode(n.id, {
-      width: n.measured?.width ?? NODE_W,
+      width: n.measured?.width ?? widthForKind(n.data.el),
       height: n.measured?.height ?? FALLBACK_H,
     }),
   );
@@ -92,7 +100,7 @@ function getLayouted(nodes: ResourceNode[], edges: Edge[]): ResourceNode[] {
   dagre.layout(g);
   return nodes.map((n) => {
     const p = g.node(n.id);
-    const w = n.measured?.width ?? NODE_W;
+    const w = n.measured?.width ?? widthForKind(n.data.el);
     const h = n.measured?.height ?? FALLBACK_H;
     return { ...n, position: { x: p.x - w / 2, y: p.y - h / 2 } };
   });

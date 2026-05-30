@@ -59,6 +59,32 @@ export type QuizElement = {
   elegida: number | null; // qué opción eligió el estudiante (si lo hizo)
 };
 
+export type TableHighlightColor = "amber" | "blue" | "gray" | "green" | "rose";
+
+export type TableHighlight = {
+  tipo: "fila" | "columna" | "celda";
+  fila?: number; // fila (tipo "fila"/"celda")
+  columna?: number; // columna (tipo "columna"/"celda")
+  color: TableHighlightColor;
+};
+
+export type TableCellChange = { fila: number; columna: number; valor: string };
+
+export type TableElement = {
+  id: string;
+  kind: "table";
+  titulo: string;
+  headers: string[]; // encabezados de columna
+  rows: string[][]; // valores actuales (editables) — texto libre
+  initialRows: string[][]; // copia de la generación inicial (para reset)
+  editable: boolean;
+  highlights: TableHighlight[]; // resaltado estático activo
+  flashCells: [number, number][]; // celdas a parpadear (último write de la IA)
+  flashTick: number; // se incrementa para re-disparar el parpadeo
+  op: { source: number; target: number; label: string } | null; // operación entre filas en curso
+  opTick: number; // se incrementa para re-disparar el deslizamiento
+};
+
 export type CanvasElement =
   | CardElement
   | FormulaElement
@@ -66,7 +92,8 @@ export type CanvasElement =
   | ChartElement
   | DrawingElement
   | ImageElement
-  | QuizElement;
+  | QuizElement
+  | TableElement;
 
 export type CanvasEdge = {
   id: string;
@@ -96,6 +123,22 @@ interface CanvasState {
   highlightNode: (id: string) => void;
   /** Revela la respuesta de un quiz; `elegida` es la opción que tocó el estudiante. */
   revealQuiz: (id: string, elegida?: number | null) => void;
+  /** Edición del usuario: cambia una celda sin mover la cámara ni re-animar. */
+  updateTableCell: (id: string, fila: number, col: number, valor: string) => void;
+  /** Devuelve la tabla a los valores con que la generó la IA. */
+  resetTable: (id: string) => void;
+  /** El asistente resalta filas/columnas/celdas (lista vacía = limpiar) y enfoca la cámara. */
+  highlightTable: (id: string, highlights: TableHighlight[]) => void;
+  /** El asistente escribe celdas con animación de parpadeo. */
+  setTableCells: (id: string, cambios: TableCellChange[]) => void;
+  /** El asistente anima una operación entre dos filas (la origen se desliza sobre la destino). */
+  operarFilas: (
+    id: string,
+    source: number,
+    target: number,
+    label: string,
+    nuevosValores: string[],
+  ) => void;
   clear: () => void;
 }
 
@@ -154,5 +197,76 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       focusTick: state.focusTick + 1,
     })),
 
+  updateTableCell: (id, fila, col, valor) =>
+    set((state) => ({
+      elements: mapTable(state.elements, id, (t) => {
+        const rows = t.rows.map((r, i) =>
+          i === fila ? r.map((c, j) => (j === col ? valor : c)) : r,
+        );
+        return { ...t, rows };
+      }),
+    })),
+
+  resetTable: (id) =>
+    set((state) => ({
+      elements: mapTable(state.elements, id, (t) => ({
+        ...t,
+        rows: t.initialRows.map((r) => [...r]),
+        highlights: [],
+        op: null,
+      })),
+    })),
+
+  highlightTable: (id, highlights) =>
+    set((state) => ({
+      elements: mapTable(state.elements, id, (t) => ({ ...t, highlights })),
+      highlightedId: id,
+      focusTick: state.focusTick + 1,
+    })),
+
+  setTableCells: (id, cambios) =>
+    set((state) => ({
+      elements: mapTable(state.elements, id, (t) => {
+        const rows = t.rows.map((r) => [...r]);
+        for (const { fila, columna, valor } of cambios) {
+          if (rows[fila] && columna < rows[fila].length) rows[fila][columna] = valor;
+        }
+        return {
+          ...t,
+          rows,
+          flashCells: cambios.map((c) => [c.fila, c.columna] as [number, number]),
+          flashTick: t.flashTick + 1,
+        };
+      }),
+      highlightedId: id,
+      focusTick: state.focusTick + 1,
+    })),
+
+  operarFilas: (id, source, target, label, nuevosValores) =>
+    set((state) => ({
+      elements: mapTable(state.elements, id, (t) => {
+        const rows = t.rows.map((r, i) =>
+          i === target ? r.map((c, j) => nuevosValores[j] ?? c) : r,
+        );
+        return {
+          ...t,
+          rows,
+          op: { source, target, label },
+          opTick: t.opTick + 1,
+        };
+      }),
+      highlightedId: id,
+      focusTick: state.focusTick + 1,
+    })),
+
   clear: () => set((state) => ({ elements: [], edges: [], highlightedId: null, version: state.version + 1 })),
 }));
+
+/** Aplica `fn` al elemento tabla con `id`, devolviendo una nueva lista de elementos. */
+function mapTable(
+  elements: CanvasElement[],
+  id: string,
+  fn: (t: TableElement) => TableElement,
+): CanvasElement[] {
+  return elements.map((e) => (e.id === id && e.kind === "table" ? fn(e) : e));
+}
