@@ -427,8 +427,8 @@ const profundizar = tool({
   }),
   execute: async ({ id, titulo }) => {
     const store = useCanvasStore.getState();
-    // Tope de 2 niveles: si ya estás dentro de otro tema, sal antes de entrar al nuevo.
-    if (store.activeParentId && store.activeParentId !== id) store.exitDepth();
+    // Profundidad ilimitada: si el tema no existe, se crea colgando del tema activo
+    // (upsertElement lo cuelga solo) y luego entramos a él para seguir creciendo el árbol.
     if (!store.elements.some((e) => e.id === id)) {
       store.upsertElement({ id, kind: "card", titulo, markdown: `# ${titulo}` });
     }
