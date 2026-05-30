@@ -1,0 +1,2234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simplex Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: #e0ddd4;
+    --text: #1a1916;
+    --text-muted: #7a7870;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --accent-mid: #93c5fd;
+    --pivot-col: #fef3c7;
+    --pivot-row: #dbeafe;
+    --op-row: #dbeafe;
+    --target-row: #e5e7eb;
+    --positive: #16a34a;
+    --negative: #dc2626;
+    --gold: #d97706;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* TOOLBAR */
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .toolbar-brand {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+  .btn-primary:disabled { background: #93c5fd; cursor: default; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--border); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: var(--surface2); }
+
+  .btn-fast {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+  }
+  .btn-fast:hover { background: #fde68a; }
+  .btn-fast.is-on {
+    background: #d97706;
+    color: white;
+    border-color: #b45309;
+  }
+
+  /* Suppress all animations in fast mode */
+  .fast-mode .step-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .fast-mode .simplex-table td,
+  .fast-mode .simplex-table tr { transition: none !important; }
+
+  .step-counter {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 4px 10px;
+    background: var(--surface2);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* INPUT SECTION */
+  .input-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  .input-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .input-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    min-width: 110px;
+    font-weight: 500;
+  }
+
+  .eq-input {
+    flex: 1;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .eq-input:focus { border-color: var(--accent); background: white; }
+  .eq-input::placeholder { color: var(--text-muted); }
+
+  .constraints-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    margin-bottom: 12px;
+  }
+
+  .constraint-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .constraint-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 24px;
+  }
+
+  .select-type {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+  }
+  .select-type:focus { border-color: var(--accent); }
+
+  .btn-icon {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface2);
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-icon:hover { background: var(--border); color: var(--text); }
+  .btn-icon.remove { color: var(--negative); }
+  .btn-icon.remove:hover { background: #fee2e2; border-color: var(--negative); }
+
+  .method-toggle {
+    display: flex;
+    gap: 3px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 3px;
+  }
+
+  .method-toggle .opt-btn {
+    padding: 5px 13px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+  }
+  .method-toggle .opt-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .granm-badge {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 1px 5px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  td.granm-cell {
+    color: #d97706 !important;
+    font-style: italic;
+    font-weight: 600;
+  }
+
+  .opt-toggle {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .opt-btn {
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    transition: all 0.15s;
+    font-family: 'DM Mono', monospace;
+  }
+  .opt-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-radius: 6px;
+    line-height: 1.6;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* GRAPH SECTION */
+  .graph-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+  }
+
+  .graph-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  canvas {
+    width: 100%;
+    max-width: 700px;
+    display: block;
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  /* STEPS SECTION */
+  .steps-section {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeUp 0.4s ease forwards;
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .step-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  .step-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .z-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-radius: 7px;
+    border-left: 3px solid var(--accent);
+    letter-spacing: 0.02em;
+  }
+
+  .z-display span.val { color: var(--accent); font-weight: 600; }
+
+  /* TABLE */
+  .table-wrap {
+    display: flex;
+    gap: 0;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+
+  .op-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 90px;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+
+  .op-header-spacer {
+    height: 36px; /* matches table header */
+  }
+
+  .op-cell {
+    height: 38px; /* matches data rows */
+    display: flex;
+    align-items: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 500;
+    padding-right: 6px;
+    white-space: nowrap;
+  }
+
+  .simplex-table {
+    border-collapse: collapse;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .simplex-table th {
+    padding: 8px 14px;
+    text-align: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .simplex-table th.pivot-col {
+    background: var(--pivot-col);
+    color: var(--gold);
+  }
+
+  .simplex-table td {
+    padding: 8px 14px;
+    text-align: center;
+    border: 1px solid var(--border);
+    transition: background 0.2s;
+    white-space: nowrap;
+    min-width: 60px;
+  }
+
+  .simplex-table td.basis-cell {
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-light);
+    min-width: 50px;
+  }
+
+  .simplex-table td.pivot-cell {
+    background: #fde68a;
+    font-weight: 700;
+    color: #92400e;
+    box-shadow: inset 0 0 0 2px #f59e0b;
+  }
+
+  tr.highlight-blue td {
+    background: var(--pivot-row) !important;
+    transition: background 0.3s;
+  }
+
+  tr.highlight-gray td {
+    background: var(--target-row) !important;
+    transition: background 0.3s;
+  }
+
+  td.blink-update {
+    animation: blinkBold 0.5s ease;
+  }
+
+  @keyframes blinkBold {
+    0%, 100% { font-weight: 400; }
+    50% { font-weight: 800; color: var(--accent); transform: scale(1.1); }
+  }
+
+  /* Op animation */
+  .op-arrow {
+    display: inline-block;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.4s ease;
+  }
+  .op-arrow.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* STATUS */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .status-optimal {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+  }
+
+  .status-infeasible {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+  }
+
+  .solution-box {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  .solution-box .sol-title {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .solution-box .sol-val {
+    color: var(--positive);
+    font-weight: 600;
+  }
+
+  .error-box {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 14px 16px;
+    color: #b91c1c;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    margin-top: 12px;
+  }
+
+  /* Legend graph */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text-muted);
+    justify-content: center;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .hidden { display: none !important; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .toolbar { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+    .main { padding: 16px 12px; }
+    .input-row { flex-wrap: wrap; }
+    .input-label { min-width: 80px; }
+  }
+
+  /* Branch and Bound */
+  .btn-integer { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+  .btn-integer:hover { background: #dcfce7; }
+  .btn-integer.is-on { background: #16a34a; color: white; border-color: #15803d; }
+
+  .bb-status-row {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .bb-sol-line {
+    font-family: 'DM Mono', monospace; font-size: 13px;
+    color: var(--text-muted); margin-bottom: 6px;
+  }
+  .bb-incumbent {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--positive);
+    padding: 6px 10px; background: #f0fdf4; border-radius: 5px;
+    border: 1px solid #86efac; margin-top: 6px;
+  }
+  .status-pruned { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+  .status-branch { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-mid); }
+  canvas.bb-tree-canvas { width: auto; max-width: none; border: none; border-radius: 0; display: block; }
+</style>
+</head>
+<body>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <span class="toolbar-brand">⬡ Simplex Visualizer</span>
+  <div class="method-toggle" id="methodToggle">
+    <button class="opt-btn active" id="mSimplexBtn" onclick="setMethod('simplex')">Simplex</button>
+    <button class="opt-btn" id="mGranMBtn" onclick="setMethod('granm')">Gran M</button>
+  </div>
+  <button class="btn btn-integer" id="btnInteger" onclick="toggleIntegerMode()">𝐙 Enteros</button>
+  <span class="step-counter" id="stepCounter" style="display:none">Paso <span id="currentStep">0</span> / <span id="totalSteps">0</span></span>
+  <button class="btn btn-ghost" id="btnReset" onclick="resetAll()" style="display:none">↺ Reiniciar</button>
+  <button class="btn btn-fast" id="btnFast" onclick="toggleFastMode()" style="display:none" title="Despliega todas las tablas sin animaciones">⚡ Modo Rápido</button>
+  <button class="btn btn-secondary" id="btnSolve" onclick="startSolving()">Resolver →</button>
+  <button class="btn btn-primary" id="btnNext" onclick="nextStep()" style="display:none" disabled>Siguiente ▶</button>
+</div>
+
+<div class="main">
+
+  <!-- INPUT -->
+  <div class="input-section" id="inputSection">
+    <div class="section-title">Definición del Problema</div>
+
+    <div class="input-grid">
+      <div class="input-row">
+        <span class="input-label">Optimizar Z =</span>
+        <input class="eq-input" id="objInput" placeholder="2x1 + 3x2   ó   5x1 + 4x2 + 3x3" value="2x1 + 3x2"/>
+        <div class="opt-toggle">
+          <button class="opt-btn active" id="maxBtn" onclick="setOpt('max')">MAX</button>
+          <button class="opt-btn" id="minBtn" onclick="setOpt('min')">MIN</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="constraints-header">
+          <span class="section-title" style="margin:0">Restricciones</span>
+          <button class="btn btn-ghost" style="font-size:12px" onclick="addConstraint()">+ Agregar restricción</button>
+        </div>
+        <div id="constraintsList"></div>
+      </div>
+    </div>
+
+    <div class="hint">
+      Sintaxis: <strong>2x1 + 3x2 &lt;= 12</strong> &nbsp;|&nbsp; Variables: x1, x2, x3 ... &nbsp;|&nbsp; Coeficientes enteros o decimales (1.5x1)
+    </div>
+  </div>
+
+  <!-- INITIAL GRAPH -->
+  <div class="graph-section" id="graphInitial" style="display:none">
+    <div class="graph-title">Región Factible — Vista Inicial</div>
+    <canvas id="canvasInitial" width="700" height="380"></canvas>
+    <div class="legend" id="legendInitial"></div>
+  </div>
+
+  <!-- B&B TREE -->
+  <div class="graph-section" id="bbTreeSection" style="display:none">
+    <div class="graph-title">Árbol Branch and Bound</div>
+    <div style="overflow-x:auto">
+      <canvas id="canvasBBTree" class="bb-tree-canvas"></canvas>
+    </div>
+    <div class="legend" id="legendBBTree" style="margin-top:12px">
+      <div class="legend-item"><div class="legend-dot" style="background:#dbeafe;border:1.5px solid #93c5fd"></div><span>Ramificado</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:1.5px solid #86efac"></div><span>Entero ✓</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fee2e2;border:1.5px solid #fca5a5"></div><span>No factible</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fef9c3;border:1.5px solid #fde047"></div><span>Podado</span></div>
+    </div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="steps-section" id="stepsSection"></div>
+
+  <!-- FINAL GRAPH -->
+  <div class="graph-section" id="graphFinal" style="display:none">
+    <div class="graph-title">Región Factible — Solución Óptima</div>
+    <canvas id="canvasFinal" width="700" height="380"></canvas>
+    <div class="legend" id="legendFinal"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+//  STATE
+// ============================================================
+let optType = 'max';
+let solveMethod = 'simplex'; // 'simplex' | 'granm'
+let constraintCount = 0;
+let steps = []; // array of tableau snapshots + meta
+let currentStepIdx = -1;
+let animating = false;
+let problem = null;
+let fastMode = false;
+let integerMode = false;
+let bbResult = null;
+
+// ============================================================
+//  INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  if (!loadFromURL()) {
+    // Default example
+    addConstraint('4x1 + 2x2', '<=', '20');
+    addConstraint('x1 + 2x2', '<=', '10');
+  }
+});
+
+// ============================================================
+//  URL STATE — serialize / deserialize problem into search params
+// ============================================================
+
+/**
+ * Serialize current form state into URL query string.
+ * Called right before solving so the URL reflects the problem being run.
+ *
+ * Schema:
+ *   obj   = "2x1 + 3x2"
+ *   opt   = "max" | "min"
+ *   m     = "simplex" | "granm"
+ *   lhs[] = "4x1 + 2x2"   (repeating)
+ *   op[]  = "<=" | ">=" | "="  (repeating, aligned with lhs[])
+ *   rhs[] = "20"           (repeating, aligned with lhs[])
+ */
+function pushStateToURL() {
+  const params = new URLSearchParams();
+
+  params.set('obj', document.getElementById('objInput').value.trim());
+  params.set('opt', optType);
+  params.set('m',   solveMethod);
+
+  document.querySelectorAll('#constraintsList .constraint-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const sel    = row.querySelector('select');
+    const lhs    = inputs[0].value.trim();
+    const rhs    = inputs[1].value.trim();
+    if (!lhs || !rhs) return;
+    params.append('lhs', lhs);
+    params.append('op',  sel.value);
+    params.append('rhs', rhs);
+  });
+
+  const newURL = `${location.pathname}?${params.toString()}`;
+  history.replaceState(null, '', newURL);
+}
+
+/**
+ * Read URL params and hydrate the form.
+ * Returns true if params were found and applied, false if URL was clean.
+ */
+function loadFromURL() {
+  const params = new URLSearchParams(location.search);
+
+  if (!params.has('obj')) return false;
+
+  // Objective
+  const objEl = document.getElementById('objInput');
+  if (objEl) objEl.value = params.get('obj') || '';
+
+  // Opt type
+  const opt = params.get('opt');
+  if (opt === 'max' || opt === 'min') setOpt(opt);
+
+  // Method
+  const method = params.get('m');
+  if (method === 'simplex' || method === 'granm') setMethod(method);
+
+  // Constraints — lhs[], op[], rhs[] are parallel arrays
+  const lhsList = params.getAll('lhs');
+  const opList  = params.getAll('op');
+  const rhsList = params.getAll('rhs');
+
+  lhsList.forEach((lhs, i) => {
+    addConstraint(lhs, opList[i] || '<=', rhsList[i] || '');
+  });
+
+  return lhsList.length > 0;
+}
+
+// ============================================================
+//  FAST MODE
+// ============================================================
+function toggleFastMode() {
+  fastMode = !fastMode;
+  const btn = document.getElementById('btnFast');
+  btn.classList.toggle('is-on', fastMode);
+  btn.textContent = fastMode ? '⚡ Rápido: ON' : '⚡ Modo Rápido';
+  document.body.classList.toggle('fast-mode', fastMode);
+
+  // If solving already in progress, flush remaining steps immediately
+  if (fastMode && steps.length > 0 && currentStepIdx < steps.length - 1) {
+    if (animating) animating = false;
+    renderAllStepsFast();
+  }
+}
+
+function renderAllStepsFast() {
+  while (currentStepIdx < steps.length - 1) {
+    currentStepIdx++;
+    document.getElementById('currentStep').textContent = currentStepIdx + 1;
+    if (integerMode) {
+      renderBBStep(steps[currentStepIdx], currentStepIdx);
+    } else {
+      renderStepInstant(steps[currentStepIdx], currentStepIdx);
+    }
+  }
+  document.getElementById('btnNext').disabled = true;
+  document.getElementById('btnNext').textContent = '✓ Completado';
+  setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 30);
+}
+
+// Renders a step without any animation — shows final tableau values immediately
+function renderStepInstant(step, idx) {
+  if (document.getElementById(`step_${idx}`)) return; // already rendered
+
+  const section = document.getElementById('stepsSection');
+  const card = document.createElement('div');
+  card.className = 'step-card';
+  card.id = `step_${idx}`;
+  card.style.cssText = 'animation:none;opacity:1;transform:none;';
+
+  const badgeText = step.type === 'initial' ? 'Tabla inicial'
+    : step.type === 'normalize' ? 'Normalizar fila pivote'
+    : step.type === 'eliminate' ? 'Eliminación gaussiana'
+    : step.type === 'optimal' ? 'Solución óptima'
+    : step.type === 'unbounded' ? 'No acotado'
+    : step.type;
+
+  const zVal = getZValue(step.tableau, step.tableau.length - 1);
+  const zMc = step.mCoefTableau ? step.mCoefTableau[step.tableau.length - 1][step.tableau[0].length - 1] : 0;
+  const zDisplay = step.useGranM && Math.abs(zMc) > 1e-9
+    ? fmtGranM(-zVal, -zMc) : formatNum(-zVal);
+
+  card.innerHTML = `
+    <div class="step-header">
+      <span class="step-badge">${badgeText}</span>
+      <span class="step-desc">${step.operation || step.desc || ''}</span>
+    </div>
+    <div class="z-display">Z = <span class="val" id="zval_${idx}">${zDisplay}</span></div>
+    <div class="table-wrap" id="twrap_${idx}"></div>
+    <div id="solution_${idx}"></div>
+  `;
+  section.appendChild(card);
+
+  buildTableHTMLInstant(step, idx);
+
+  if (step.type === 'optimal' || step.type === 'unbounded') {
+    renderSolution(step, idx);
+    renderFinalGraph(step);
+  }
+}
+
+// Like buildTableHTML but always uses final tableau values — no prevTableau animation trick
+function buildTableHTMLInstant(step, idx) {
+  const { tableau, mCoefTableau, basis, allVars, pivotRow, pivotCol, useGranM } = step;
+  const m = tableau.length - 1;
+  const cols = allVars.length + 1;
+  const wrap = document.getElementById(`twrap_${idx}`);
+
+  const opCol = document.createElement('div');
+  opCol.className = 'op-column';
+  opCol.appendChild(Object.assign(document.createElement('div'), { className: 'op-header-spacer' }));
+
+  for (let i = 0; i <= m; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'op-cell';
+    cell.id = `oprow_${idx}_${i}`;
+    if (step.type === 'normalize' && i === step.pivotRow) cell.textContent = step.operation || '';
+    if (step.type === 'eliminate' && i === step.targetRow) cell.textContent = step.operation || '';
+    opCol.appendChild(cell);
+  }
+
+  const table = document.createElement('table');
+  table.className = 'simplex-table';
+
+  let hdr = '<thead><tr><th>Base</th>';
+  for (let j = 0; j < allVars.length; j++) {
+    hdr += `<th class="${j === pivotCol ? 'pivot-col' : ''}">${allVars[j]}</th>`;
+  }
+  hdr += '<th>RHS</th></tr></thead>';
+  table.innerHTML = hdr;
+
+  const tbody = document.createElement('tbody');
+  for (let i = 0; i <= m; i++) {
+    const tr = document.createElement('tr');
+    const td0 = document.createElement('td');
+    td0.className = 'basis-cell';
+    td0.textContent = i === m ? 'Z' : basis[i];
+    tr.appendChild(td0);
+
+    for (let j = 0; j < cols; j++) {
+      const td = document.createElement('td');
+      const val = tableau[i][j];
+      const mc = mCoefTableau && mCoefTableau[i] ? mCoefTableau[i][j] : 0;
+      if (useGranM && Math.abs(mc) > 1e-9) {
+        td.classList.add('granm-cell');
+        td.textContent = fmtGranM(val, mc);
+      } else {
+        td.textContent = formatNum(val);
+      }
+      if (i === pivotRow && j === pivotCol) td.classList.add('pivot-cell');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  wrap.appendChild(opCol);
+  wrap.appendChild(table);
+}
+
+function setOpt(type) {
+  optType = type;
+  document.getElementById('maxBtn').classList.toggle('active', type === 'max');
+  document.getElementById('minBtn').classList.toggle('active', type === 'min');
+}
+
+function setMethod(m) {
+  solveMethod = m;
+  document.getElementById('mSimplexBtn').classList.toggle('active', m === 'simplex');
+  document.getElementById('mGranMBtn').classList.toggle('active', m === 'granm');
+}
+
+function addConstraint(val = '', type = '<=', rhs = '') {
+  constraintCount++;
+  const id = `con_${constraintCount}`;
+  const div = document.createElement('div');
+  div.className = 'constraint-row';
+  div.id = id;
+  div.innerHTML = `
+    <span class="constraint-num">${constraintCount}.</span>
+    <input class="eq-input" style="flex:1" placeholder="3x1 + 2x2" value="${val}">
+    <select class="select-type">
+      <option value="<=" ${type==='<='?'selected':''}>≤</option>
+      <option value=">=" ${type==='>='?'selected':''}>≥</option>
+      <option value="=" ${type==='='?'selected':''}>＝</option>
+    </select>
+    <input class="eq-input" style="width:80px" placeholder="0" value="${rhs}">
+    <button class="btn-icon remove" onclick="document.getElementById('${id}').remove()">×</button>
+  `;
+  document.getElementById('constraintsList').appendChild(div);
+}
+
+// ============================================================
+//  PARSING
+// ============================================================
+function parseExpression(str) {
+  // Returns map { 'x1': coef, 'x2': coef, ... }
+  const coeffs = {};
+  const clean = str.replace(/\s+/g, '').replace(/−/g, '-');
+  const regex = /([+-]?(?:\d+\.?\d*)?)(x\d+)/g;
+  let match;
+  while ((match = regex.exec(clean)) !== null) {
+    let c = match[1];
+    if (c === '' || c === '+') c = 1;
+    else if (c === '-') c = -1;
+    else c = parseFloat(c);
+    const v = match[2];
+    coeffs[v] = (coeffs[v] || 0) + c;
+  }
+  return coeffs;
+}
+
+function getAllVars(objCoeffs, constraints) {
+  const varSet = new Set(Object.keys(objCoeffs));
+  for (const c of constraints) Object.keys(c.lhs).forEach(v => varSet.add(v));
+  return Array.from(varSet).sort((a, b) => {
+    const na = parseInt(a.replace('x', ''));
+    const nb = parseInt(b.replace('x', ''));
+    return na - nb;
+  });
+}
+
+function parseProblem() {
+  const objStr = document.getElementById('objInput').value.trim();
+  if (!objStr) return null;
+
+  const objCoeffs = parseExpression(objStr);
+
+  const conRows = document.querySelectorAll('#constraintsList .constraint-row');
+  const constraints = [];
+  for (const row of conRows) {
+    const inputs = row.querySelectorAll('input');
+    const sel = row.querySelector('select');
+    const lhsStr = inputs[0].value.trim();
+    const rhsStr = inputs[1].value.trim();
+    if (!lhsStr || !rhsStr) continue;
+    const rhs = parseFloat(rhsStr);
+    if (isNaN(rhs)) continue;
+    const lhs = parseExpression(lhsStr);
+    constraints.push({ lhs, type: sel.value, rhs });
+  }
+
+  if (!constraints.length) return null;
+
+  const vars = getAllVars(objCoeffs, constraints);
+  return { objCoeffs, constraints, vars, optType };
+}
+
+// ============================================================
+//  SIMPLEX SOLVER — supports Simplex estándar y Gran M
+// ============================================================
+const BIG_M = 1e7; // numeric M value for computation
+
+// Symbolic number: { num: numeric_value, mCoef: M_coefficient }
+// Represents: num + mCoef * M
+// For display: if mCoef != 0 and granM mode, show "X + kM"
+function sym(num, mCoef = 0) { return { num, mCoef }; }
+function symAdd(a, b) { return sym(a.num + b.num, a.mCoef + b.mCoef); }
+function symScale(a, k) { return sym(a.num * k, a.mCoef * k); }
+function symNeg(a) { return sym(-a.num, -a.mCoef); }
+function symVal(a) { return a.num + a.mCoef * BIG_M; }
+function symFmt(a, granM) {
+  if (!granM) return formatNum(symVal(a));
+  const n = Math.abs(a.num) < 1e-9 ? 0 : a.num;
+  const m = Math.abs(a.mCoef) < 1e-9 ? 0 : a.mCoef;
+  if (m === 0) return formatNum(n);
+  const mStr = Math.abs(m) === 1 ? 'M' : `${formatNum(Math.abs(m))}M`;
+  if (n === 0) return m > 0 ? mStr : `-${mStr}`;
+  const sign = m > 0 ? ' + ' : ' - ';
+  return `${formatNum(n)}${sign}${mStr}`;
+}
+
+function buildTableau(prob, useGranM) {
+  const { objCoeffs, constraints, vars, optType } = prob;
+  const n = vars.length;
+  const m = constraints.length;
+
+  const slackVars = [];
+  const artificialVars = [];
+  const basis = [];
+
+  for (let i = 0; i < m; i++) {
+    const c = constraints[i];
+    if (c.type === '<=') {
+      slackVars.push({ name: `s${i+1}`, row: i, sign: 1 });
+      basis.push(`s${i+1}`);
+    } else if (c.type === '>=') {
+      slackVars.push({ name: `s${i+1}`, row: i, sign: -1 });
+      artificialVars.push({ name: `a${i+1}`, row: i });
+      basis.push(`a${i+1}`);
+    } else {
+      artificialVars.push({ name: `a${i+1}`, row: i });
+      basis.push(`a${i+1}`);
+    }
+  }
+
+  const allVars = [...vars, ...slackVars.map(s => s.name), ...artificialVars.map(a => a.name)];
+  const totalCols = allVars.length + 1;
+
+  // Build constraint rows with symbolic entries
+  const tableau = []; // array of array of sym objects
+
+  for (let i = 0; i < m; i++) {
+    const row = new Array(totalCols).fill(null).map(() => sym(0));
+    const c = constraints[i];
+    for (let j = 0; j < n; j++) row[j] = sym(c.lhs[vars[j]] || 0);
+    for (let s = 0; s < slackVars.length; s++) {
+      if (slackVars[s].row === i) row[n + s] = sym(slackVars[s].sign);
+    }
+    for (let a = 0; a < artificialVars.length; a++) {
+      if (artificialVars[a].row === i) row[n + slackVars.length + a] = sym(1);
+    }
+    row[totalCols - 1] = sym(c.rhs);
+    tableau.push(row);
+  }
+
+  // Z row
+  const zRow = new Array(totalCols).fill(null).map(() => sym(0));
+  const sign = optType === 'max' ? -1 : 1;
+  for (let j = 0; j < n; j++) zRow[j] = sym(sign * (objCoeffs[vars[j]] || 0));
+
+  // M penalty for artificials
+  for (let a = 0; a < artificialVars.length; a++) {
+    const av = artificialVars[a];
+    const col = n + slackVars.length + a;
+    // In Z: + M * a_i (for max, we want to drive artificials out)
+    // Z row entry for artificial: M (adds cost)
+    zRow[col] = sym(0, 1); // M coefficient before elimination
+
+    // Eliminate artificial from Z row: Z -= M * constraint_row
+    for (let k = 0; k < totalCols; k++) {
+      zRow[k] = symAdd(zRow[k], symScale(tableau[av.row][k], sym(-BIG_M, -1).num === 0 ? sym(0, -1) : sym(0, -1)));
+      // Simpler: zRow[k] = zRow[k] - M * tableau[av.row][k]
+    }
+  }
+
+  // Rebuild Z row cleanly
+  const zRowClean = new Array(totalCols).fill(null).map(() => sym(0));
+  for (let j = 0; j < n; j++) zRowClean[j] = sym(sign * (objCoeffs[vars[j]] || 0));
+  // Slack vars: 0 cost
+  // Artificials: M cost, but eliminate basis artificials
+  for (let a = 0; a < artificialVars.length; a++) {
+    const col = n + slackVars.length + a;
+    zRowClean[col] = sym(0, 1); // +M
+    for (let k = 0; k < totalCols; k++) {
+      const entry = tableau[artificialVars[a].row][k];
+      zRowClean[k] = symAdd(zRowClean[k], sym(-entry.num * BIG_M, -entry.mCoef * BIG_M / BIG_M));
+    }
+  }
+
+  // Even simpler: just use numeric for computation, store mCoef separately
+  const numTableau = tableau.map(row => row.map(c => symVal(c)));
+  const numZRow = new Array(totalCols).fill(0);
+  for (let j = 0; j < n; j++) numZRow[j] = sign * (objCoeffs[vars[j]] || 0);
+  for (let a = 0; a < artificialVars.length; a++) {
+    const av = artificialVars[a];
+    const col = n + slackVars.length + a;
+    numZRow[col] += BIG_M;
+    for (let k = 0; k < totalCols; k++) numZRow[k] -= BIG_M * numTableau[av.row][k];
+  }
+  numTableau.push(numZRow);
+
+  // Symbolic Z row for display (Gran M mode): track mCoef per cell
+  // mCoef array parallel to numTableau Z row
+  const mCoefZRow = new Array(totalCols).fill(0);
+  // Original obj in Z:
+  for (let j = 0; j < n; j++) mCoefZRow[j] = 0;
+  for (let a = 0; a < artificialVars.length; a++) {
+    const col = n + slackVars.length + a;
+    mCoefZRow[col] += 1; // +M
+    for (let k = 0; k < totalCols; k++) {
+      mCoefZRow[k] -= tableau[artificialVars[a].row][k].num; // -M * coef (mCoef part)
+    }
+  }
+
+  // Build mCoef parallel tableau: mCoef[i][j] only meaningful for Z row at i=m
+  const mCoefTableau = numTableau.map(() => new Array(totalCols).fill(0));
+  mCoefTableau[m] = mCoefZRow;
+
+  return {
+    tableau: numTableau,
+    mCoefTableau,
+    basis: [...basis],
+    allVars,
+    n, m,
+    slackVars, artificialVars,
+    vars,
+    useGranM
+  };
+}
+
+function cloneTableau(t) {
+  return t.map(row => [...row]);
+}
+
+function solveSimplex(prob, useGranM) {
+  const tb = buildTableau(prob, useGranM);
+  const { m, allVars } = tb;
+  const steps = [];
+  const MAX_ITER = 40;
+  let tableau = tb.tableau;
+  let mCoef = tb.mCoefTableau;
+  let basis = tb.basis;
+
+  const cloneMCoef = mc => mc.map(row => [...row]);
+
+  steps.push({
+    type: 'initial',
+    tableau: cloneTableau(tableau),
+    mCoefTableau: cloneMCoef(mCoef),
+    basis: [...basis],
+    allVars,
+    pivotRow: -1, pivotCol: -1,
+    operation: null,
+    desc: `Tabla inicial — Método ${useGranM ? 'Gran M' : 'Simplex Estándar'}`,
+    useGranM
+  });
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const zRow = tableau[m];
+    const totalCols = zRow.length;
+
+    // Pivot column: most negative in Z row (numeric)
+    let pivotCol = -1;
+    let minVal = -1e-9;
+    for (let j = 0; j < totalCols - 1; j++) {
+      if (zRow[j] < minVal) { minVal = zRow[j]; pivotCol = j; }
+    }
+
+    if (pivotCol === -1) {
+      steps.push({ type: 'optimal', tableau: cloneTableau(tableau), mCoefTableau: cloneMCoef(mCoef), basis: [...basis], allVars, pivotRow:-1, pivotCol:-1, operation:null, desc:'✓ Solución óptima alcanzada', useGranM });
+      break;
+    }
+
+    let pivotRow = -1;
+    let minRatio = Infinity;
+    for (let i = 0; i < m; i++) {
+      if (tableau[i][pivotCol] > 1e-9) {
+        const ratio = tableau[i][totalCols - 1] / tableau[i][pivotCol];
+        if (ratio < minRatio) { minRatio = ratio; pivotRow = i; }
+      }
+    }
+
+    if (pivotRow === -1) {
+      steps.push({ type: 'unbounded', desc: 'Problema no acotado', tableau: cloneTableau(tableau), mCoefTableau: cloneMCoef(mCoef), basis: [...basis], allVars, pivotRow:-1, pivotCol:-1, operation:null, useGranM });
+      break;
+    }
+
+    const pivotEl = tableau[pivotRow][pivotCol];
+    const entering = allVars[pivotCol];
+    const leaving = basis[pivotRow];
+
+    // Normalize pivot row
+    const beforeNorm = cloneTableau(tableau);
+    const beforeMNorm = cloneMCoef(mCoef);
+    for (let j = 0; j < totalCols; j++) {
+      tableau[pivotRow][j] /= pivotEl;
+      mCoef[pivotRow][j] /= pivotEl;
+    }
+    basis[pivotRow] = entering;
+
+    steps.push({
+      type: 'normalize',
+      tableau: cloneTableau(tableau),
+      mCoefTableau: cloneMCoef(mCoef),
+      prevTableau: beforeNorm,
+      prevMCoef: beforeMNorm,
+      basis: [...basis],
+      allVars,
+      pivotRow, pivotCol,
+      factor: `÷ ${formatNum(pivotEl)}`,
+      entering, leaving,
+      operation: `F${pivotRow+1} ← F${pivotRow+1} / ${formatNum(pivotEl)}`,
+      desc: `Normalizar fila pivote (${entering} entra, ${leaving} sale)`,
+      useGranM
+    });
+
+    for (let i = 0; i <= m; i++) {
+      if (i === pivotRow) continue;
+      const factor = tableau[i][pivotCol];
+      if (Math.abs(factor) < 1e-12) continue;
+      const beforeElim = cloneTableau(tableau);
+      const beforeMElim = cloneMCoef(mCoef);
+      for (let j = 0; j < totalCols; j++) {
+        tableau[i][j] -= factor * tableau[pivotRow][j];
+        mCoef[i][j] -= factor * mCoef[pivotRow][j];
+      }
+      const label = i === m ? 'Z' : `F${i+1}`;
+      const pivLabel = `F${pivotRow+1}`;
+      const opSign = factor > 0 ? '-' : '+';
+      steps.push({
+        type: 'eliminate',
+        tableau: cloneTableau(tableau),
+        mCoefTableau: cloneMCoef(mCoef),
+        prevTableau: beforeElim,
+        prevMCoef: beforeMElim,
+        basis: [...basis],
+        allVars,
+        pivotRow, pivotCol,
+        targetRow: i,
+        factor, entering, leaving,
+        operation: `${label} ← ${label} ${opSign} ${formatNum(Math.abs(factor))}·${pivLabel}`,
+        desc: `Eliminar ${entering} de fila ${label}`,
+        useGranM
+      });
+    }
+  }
+
+  return { steps, vars: tb.vars, allVars, m, slackVars: tb.slackVars };
+}
+
+function formatNum(n) {
+  if (Math.abs(n) < 1e-9) return '0';
+  if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  return parseFloat(n.toFixed(3)).toString();
+}
+
+// ============================================================
+//  GRAPHING (2-variable only)
+// ============================================================
+function drawGraph(canvasId, constraints, vars, solution, optCoeffs, legendId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (vars.length > 2) {
+    ctx.fillStyle = '#7a7870';
+    ctx.font = '14px DM Sans';
+    ctx.textAlign = 'center';
+    ctx.fillText('Gráfica disponible solo para 2 variables.', W/2, H/2);
+    return;
+  }
+
+  const pad = 60;
+  const plotW = W - pad * 2;
+  const plotH = H - pad * 2;
+
+  // Determine bounds
+  let maxX = 0, maxY = 0;
+  for (const c of constraints) {
+    const a = c.lhs[vars[0]] || 0;
+    const b = c.lhs[vars[1]] || 0;
+    if (a > 0) maxX = Math.max(maxX, c.rhs / a * 1.3);
+    if (b > 0) maxY = Math.max(maxY, c.rhs / b * 1.3);
+  }
+  maxX = Math.max(maxX, 15);
+  maxY = Math.max(maxY, 15);
+
+  const toCanvasX = x => pad + (x / maxX) * plotW;
+  const toCanvasY = y => H - pad - (y / maxY) * plotH;
+
+  // Draw feasible region (brute force grid)
+  const gridSize = 3;
+  ctx.fillStyle = 'rgba(37,99,235,0.07)';
+  for (let px = 0; px <= plotW; px += gridSize) {
+    for (let py = 0; py <= plotH; py += gridSize) {
+      const x = (px / plotW) * maxX;
+      const y = (py / plotH) * maxY;
+      if (x >= 0 && y >= 0 && isFeasible(x, y, constraints, vars)) {
+        ctx.fillRect(pad + px, H - pad - py - gridSize, gridSize, gridSize);
+      }
+    }
+  }
+
+  // Axes
+  ctx.strokeStyle = '#d0cdc4';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, pad); ctx.lineTo(pad, H - pad); ctx.lineTo(W - pad, H - pad);
+  ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#7a7870';
+  ctx.font = '11px DM Mono';
+  ctx.textAlign = 'center';
+  for (let v = 0; v <= 4; v++) {
+    const xv = (v / 4) * maxX;
+    const yv = (v / 4) * maxY;
+    const cx = toCanvasX(xv), cy = toCanvasY(yv);
+    ctx.fillText(formatNum(xv), cx, H - pad + 15);
+    ctx.textAlign = 'right';
+    ctx.fillText(formatNum(yv), pad - 6, cy + 4);
+    ctx.textAlign = 'center';
+  }
+
+  ctx.fillStyle = '#1a1916';
+  ctx.font = '12px DM Mono';
+  ctx.fillText(vars[0], W - pad + 14, H - pad + 5);
+  ctx.fillText(vars[1], pad + 5, pad - 8);
+
+  // Constraint lines
+  const colors = ['#2563eb','#16a34a','#d97706','#9333ea','#dc2626'];
+  const legendItems = [];
+
+  constraints.forEach((c, i) => {
+    const color = colors[i % colors.length];
+    const a = c.lhs[vars[0]] || 0;
+    const b = c.lhs[vars[1]] || 0;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath();
+
+    if (Math.abs(b) > 1e-9) {
+      const x0 = 0, y0 = (c.rhs - a * x0) / b;
+      const x1 = maxX, y1 = (c.rhs - a * x1) / b;
+      ctx.moveTo(toCanvasX(x0), toCanvasY(y0));
+      ctx.lineTo(toCanvasX(x1), toCanvasY(y1));
+    } else if (Math.abs(a) > 1e-9) {
+      const x = c.rhs / a;
+      ctx.moveTo(toCanvasX(x), toCanvasY(0));
+      ctx.lineTo(toCanvasX(x), toCanvasY(maxY));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    legendItems.push({ color, label: `R${i+1}: ${buildConstraintStr(c, vars)}` });
+  });
+
+  // Optimal point
+  if (solution) {
+    const sx = solution[vars[0]] || 0;
+    const sy = solution[vars[1]] || 0;
+    const cx = toCanvasX(sx), cy = toCanvasY(sy);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#2563eb';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#1a1916';
+    ctx.font = '600 12px DM Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(`(${formatNum(sx)}, ${formatNum(sy)})`, cx + 12, cy - 6);
+    legendItems.push({ color: '#2563eb', label: `Óptimo: (${formatNum(sx)}, ${formatNum(sy)})`, dot: true });
+  }
+
+  // Legend
+  const legendEl = document.getElementById(legendId);
+  legendEl.innerHTML = legendItems.map(item =>
+    `<div class="legend-item">
+      <div class="legend-dot" style="background:${item.color};${item.dot?'box-shadow:0 0 0 2px white,0 0 0 3px '+item.color:''}"></div>
+      <span>${item.label}</span>
+    </div>`
+  ).join('');
+}
+
+function buildConstraintStr(c, vars) {
+  const parts = vars.map(v => {
+    const coef = c.lhs[v] || 0;
+    if (coef === 0) return null;
+    return `${formatNum(coef)}${v}`;
+  }).filter(Boolean);
+  const typeStr = c.type === '<=' ? '≤' : c.type === '>=' ? '≥' : '=';
+  return `${parts.join(' + ')} ${typeStr} ${formatNum(c.rhs)}`;
+}
+
+function isFeasible(x, y, constraints, vars) {
+  for (const c of constraints) {
+    const a = c.lhs[vars[0]] || 0;
+    const b = c.lhs[vars[1]] || 0;
+    const lhs = a * x + b * y;
+    if (c.type === '<=' && lhs > c.rhs + 1e-9) return false;
+    if (c.type === '>=' && lhs < c.rhs - 1e-9) return false;
+    if (c.type === '=' && Math.abs(lhs - c.rhs) > 1e-9) return false;
+  }
+  return x >= -1e-9 && y >= -1e-9;
+}
+
+// ============================================================
+//  SOLVE & SETUP STEPS
+// ============================================================
+function startSolving() {
+  const prob = parseProblem();
+  if (!prob) { alert('Ingresa la función objetivo y al menos una restricción válida.'); return; }
+  if (prob.vars.length === 0) { alert('No se detectaron variables (x1, x2...).'); return; }
+
+  // Persist current problem to URL for shareable / bookmarkable templates
+  pushStateToURL();
+
+  problem = prob;
+  currentStepIdx = -1;
+
+  if (integerMode) {
+    bbResult = solveBranchAndBound(prob);
+    steps = bbResult.bbSteps;
+  } else {
+    const useGranM = solveMethod === 'granm';
+    const result = solveSimplex(prob, useGranM);
+    steps = result.steps;
+    bbResult = null;
+  }
+
+  // Hide input, show toolbar controls
+  document.getElementById('inputSection').style.display = 'none';
+  document.getElementById('btnSolve').style.display = 'none';
+  document.getElementById('methodToggle').style.display = 'none';
+  document.getElementById('btnInteger').style.display = 'none';
+  document.getElementById('btnNext').style.display = 'inline-flex';
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnReset').style.display = 'inline-flex';
+  document.getElementById('btnFast').style.display = 'inline-flex';
+  document.getElementById('stepCounter').style.display = 'inline-flex';
+  document.getElementById('totalSteps').textContent = steps.length;
+
+  document.getElementById('stepsSection').innerHTML = '';
+  document.getElementById('bbTreeSection').style.display = 'none';
+
+  // Initial graph (LP mode only)
+  if (!integerMode && prob.vars.length <= 2) {
+    document.getElementById('graphInitial').style.display = 'block';
+    drawGraph('canvasInitial', prob.constraints, prob.vars, null, prob.objCoeffs, 'legendInitial');
+  }
+
+  if (fastMode) {
+    renderAllStepsFast();
+  } else {
+    nextStep();
+  }
+}
+
+function nextStep() {
+  if (animating) return;
+  currentStepIdx++;
+  if (currentStepIdx >= steps.length) {
+    document.getElementById('btnNext').disabled = true;
+    return;
+  }
+
+  document.getElementById('currentStep').textContent = currentStepIdx + 1;
+
+  const step = steps[currentStepIdx];
+  const isLast = currentStepIdx === steps.length - 1;
+
+  if (isLast) {
+    document.getElementById('btnNext').disabled = true;
+    document.getElementById('btnNext').textContent = '✓ Completado';
+  }
+
+  if (integerMode) {
+    renderBBStep(step, currentStepIdx);
+  } else if (fastMode) {
+    renderStepInstant(step, currentStepIdx);
+  } else {
+    renderStep(step, currentStepIdx);
+  }
+
+  setTimeout(() => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }, 80);
+}
+
+// ============================================================
+//  RENDER STEP
+// ============================================================
+function renderStep(step, idx) {
+  const section = document.getElementById('stepsSection');
+
+  const card = document.createElement('div');
+  card.className = 'step-card';
+  card.id = `step_${idx}`;
+
+  const badgeText = step.type === 'initial' ? 'Tabla inicial'
+    : step.type === 'normalize' ? 'Normalizar fila pivote'
+    : step.type === 'eliminate' ? 'Eliminación gaussiana'
+    : step.type === 'optimal' ? 'Solución óptima'
+    : step.type === 'unbounded' ? 'No acotado'
+    : step.type;
+
+  // Z value
+  const zVal = getZValue(step.tableau, step.tableau.length - 1);
+  const zMc = step.mCoefTableau ? step.mCoefTableau[step.tableau.length - 1][step.tableau[0].length - 1] : 0;
+  const zDisplay = step.useGranM && Math.abs(zMc) > 1e-9
+    ? fmtGranM(-zVal, -zMc)
+    : formatNum(-zVal);
+
+  card.innerHTML = `
+    <div class="step-header">
+      <span class="step-badge">${badgeText}</span>
+      <span class="step-desc">${step.operation || step.desc || ''}</span>
+    </div>
+    <div class="z-display">
+      Z = <span class="val" id="zval_${idx}">${zDisplay}</span>
+    </div>
+    <div class="table-wrap" id="twrap_${idx}"></div>
+    <div id="solution_${idx}"></div>
+  `;
+
+  section.appendChild(card);
+
+  // Build table
+  buildTableHTML(step, idx);
+
+  // Show solution if optimal
+  if (step.type === 'optimal' || step.type === 'unbounded') {
+    renderSolution(step, idx);
+    renderFinalGraph(step);
+  }
+
+  // Animate
+  if (step.type === 'normalize' || step.type === 'eliminate') {
+    animateStep(step, idx);
+  }
+}
+
+function getZValue(tableau, mIdx) {
+  // Z row is last row, RHS is last col
+  const zRow = tableau[mIdx];
+  return zRow[zRow.length - 1];
+}
+
+function buildTableHTML(step, idx) {
+  const { tableau, mCoefTableau, basis, allVars, pivotRow, pivotCol, useGranM } = step;
+  const m = tableau.length - 1;
+  const cols = allVars.length + 1; // +1 RHS
+
+  // Use prevTableau for initial display if this step has animation
+  const hasAnim = step.type === 'normalize' || step.type === 'eliminate';
+  const displayTableau = hasAnim && step.prevTableau ? step.prevTableau : tableau;
+  const displayMCoef = hasAnim && step.prevMCoef ? step.prevMCoef : (mCoefTableau || tableau.map(r => r.map(() => 0)));
+
+  const wrap = document.getElementById(`twrap_${idx}`);
+
+  // Op column
+  const opCol = document.createElement('div');
+  opCol.className = 'op-column';
+  opCol.id = `opcol_${idx}`;
+
+  const spacer = document.createElement('div');
+  spacer.className = 'op-header-spacer';
+  opCol.appendChild(spacer);
+
+  for (let i = 0; i <= m; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'op-cell';
+    cell.id = `oprow_${idx}_${i}`;
+    opCol.appendChild(cell);
+  }
+
+  // Table
+  const table = document.createElement('table');
+  table.className = 'simplex-table';
+  table.id = `table_${idx}`;
+
+  // Header
+  let hdr = '<thead><tr><th>Base</th>';
+  for (let j = 0; j < allVars.length; j++) {
+    const isp = (j === pivotCol);
+    hdr += `<th class="${isp ? 'pivot-col' : ''}">${allVars[j]}</th>`;
+  }
+  hdr += '<th>RHS</th></tr></thead>';
+  table.innerHTML = hdr;
+
+  const tbody = document.createElement('tbody');
+  for (let i = 0; i <= m; i++) {
+    const tr = document.createElement('tr');
+    tr.id = `row_${idx}_${i}`;
+
+    const basisLabel = i === m ? 'Z' : basis[i];
+    const td0 = document.createElement('td');
+    td0.className = 'basis-cell';
+    td0.textContent = basisLabel;
+    tr.appendChild(td0);
+
+    for (let j = 0; j < cols; j++) {
+      const td = document.createElement('td');
+      td.id = `cell_${idx}_${i}_${j}`;
+      const val = displayTableau[i][j];
+      const mc = displayMCoef[i] ? displayMCoef[i][j] : 0;
+
+      // Gran M: show symbolic only for Z row and artificial columns
+      const isArtificialCol = allVars[j] && allVars[j].startsWith('a');
+      const isZRow = (i === m);
+      if (useGranM && Math.abs(mc) > 1e-9) {
+        td.classList.add('granm-cell');
+        td.textContent = fmtGranM(val, mc);
+      } else {
+        td.textContent = formatNum(val);
+      }
+
+      if (i === pivotRow && j === pivotCol) td.classList.add('pivot-cell');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  wrap.appendChild(opCol);
+  wrap.appendChild(table);
+}
+
+function fmtGranM(numVal, mCoef) {
+  // numVal is numeric part after substituting M
+  // mCoef is the M coefficient in the symbolic expression
+  const n = Math.abs(numVal - mCoef * BIG_M) < 1e-4 ? numVal - mCoef * BIG_M : numVal - mCoef * BIG_M;
+  const pureNum = numVal - mCoef * BIG_M;
+  const pureStr = Math.abs(pureNum) < 1e-9 ? '' : formatNum(pureNum);
+  const mStr = Math.abs(mCoef) < 1e-9 ? '' :
+    (Math.abs(mCoef) === 1 ? (mCoef > 0 ? 'M' : '-M') : `${formatNum(mCoef)}M`);
+
+  if (!pureStr && !mStr) return '0';
+  if (!pureStr) return mStr;
+  if (!mStr) return pureStr;
+  return mCoef > 0 ? `${pureStr}+${mStr}` : `${pureStr}${mStr}`;
+}
+
+// ============================================================
+//  ANIMATION
+// ============================================================
+function animateStep(step, idx) {
+  animating = true;
+  document.getElementById('btnNext').disabled = true;
+
+  const m = step.tableau.length - 1;
+  const cols = step.allVars.length + 1;
+  const useGranM = step.useGranM;
+
+  const DELAY = 400;
+  const ANIM_DUR = 3000;
+  const BLINK_DUR = 500;
+
+  // Helper: get display string for a cell in the FINAL tableau
+  const getCellDisplay = (rowIdx, colIdx) => {
+    const val = step.tableau[rowIdx][colIdx];
+    const mc = step.mCoefTableau && step.mCoefTableau[rowIdx] ? step.mCoefTableau[rowIdx][colIdx] : 0;
+    if (useGranM && Math.abs(mc) > 1e-9) return fmtGranM(val, mc);
+    return formatNum(val);
+  };
+
+  if (step.type === 'normalize') {
+    const pr = step.pivotRow;
+    const opCell = document.getElementById(`oprow_${idx}_${pr}`);
+
+    setTimeout(() => {
+      const row = document.getElementById(`row_${idx}_${pr}`);
+      if (row) row.classList.add('highlight-blue');
+      if (opCell) { opCell.textContent = step.operation; opCell.style.opacity = '0'; opCell.style.transform = 'translateX(-12px)'; opCell.style.transition = 'all 0.4s ease'; requestAnimationFrame(() => { opCell.style.opacity = '1'; opCell.style.transform = 'translateX(0)'; }); }
+
+      setTimeout(() => {
+        // Cells currently show prevTableau values → update to new values
+        for (let j = 0; j < cols; j++) {
+          const cell = document.getElementById(`cell_${idx}_${pr}_${j}`);
+          if (!cell) continue;
+          const prevVal = step.prevTableau[pr][j];
+          const newDisplay = getCellDisplay(pr, j);
+          const prevDisplay = formatNum(prevVal);
+          if (prevDisplay !== newDisplay) {
+            cell.classList.add('blink-update');
+            setTimeout(() => {
+              cell.textContent = newDisplay;
+              if (useGranM && step.mCoefTableau && Math.abs(step.mCoefTableau[pr][j]) > 1e-9)
+                cell.classList.add('granm-cell');
+              else cell.classList.remove('granm-cell');
+              cell.classList.remove('blink-update');
+            }, BLINK_DUR / 2);
+          }
+        }
+        // Update Z display
+        const zVal = step.tableau[m][cols - 1];
+        const zMc = step.mCoefTableau ? step.mCoefTableau[m][cols - 1] : 0;
+        const zEl = document.getElementById(`zval_${idx}`);
+        if (zEl) zEl.textContent = useGranM && Math.abs(zMc) > 1e-9
+          ? fmtGranM(-zVal, -zMc)
+          : formatNum(-zVal);
+
+        setTimeout(() => {
+          if (row) row.classList.remove('highlight-blue');
+          finishAnim();
+        }, BLINK_DUR + 300);
+      }, ANIM_DUR);
+    }, DELAY);
+
+  } else if (step.type === 'eliminate') {
+    const pr = step.pivotRow;
+    const tr = step.targetRow;
+    const opCell = document.getElementById(`oprow_${idx}_${tr}`);
+
+    setTimeout(() => {
+      const pivotRowEl = document.getElementById(`row_${idx}_${pr}`);
+      const targetRowEl = document.getElementById(`row_${idx}_${tr}`);
+      if (targetRowEl) targetRowEl.classList.add('highlight-gray');
+      if (pivotRowEl) pivotRowEl.classList.add('highlight-blue');
+      if (opCell) { opCell.textContent = step.operation; opCell.style.opacity = '0'; opCell.style.transform = 'translateX(-12px)'; opCell.style.transition = 'all 0.4s ease'; requestAnimationFrame(() => { opCell.style.opacity = '1'; opCell.style.transform = 'translateX(0)'; }); }
+
+      // Slide pivot row toward target row
+      if (pivotRowEl && targetRowEl) {
+        const srcRect = pivotRowEl.getBoundingClientRect();
+        const dstRect = targetRowEl.getBoundingClientRect();
+        const dy = dstRect.top - srcRect.top;
+        pivotRowEl.style.transition = `transform ${ANIM_DUR}ms cubic-bezier(0.4,0,0.2,1)`;
+        pivotRowEl.style.transform = `translateY(${dy}px)`;
+        pivotRowEl.style.opacity = '0.55';
+        pivotRowEl.style.zIndex = '10';
+        pivotRowEl.style.position = 'relative';
+      }
+
+      setTimeout(() => {
+        if (pivotRowEl) {
+          pivotRowEl.style.transition = 'none';
+          pivotRowEl.style.transform = '';
+          pivotRowEl.style.opacity = '';
+          pivotRowEl.style.zIndex = '';
+          pivotRowEl.style.position = '';
+        }
+
+        // Cells currently show prevTableau values → update target row to new values
+        for (let j = 0; j < cols; j++) {
+          const cell = document.getElementById(`cell_${idx}_${tr}_${j}`);
+          if (!cell) continue;
+          const prevVal = step.prevTableau[tr][j];
+          const newDisplay = getCellDisplay(tr, j);
+          const prevDisplay = formatNum(prevVal);
+          if (prevDisplay !== newDisplay) {
+            cell.classList.add('blink-update');
+            setTimeout(() => {
+              cell.textContent = newDisplay;
+              if (useGranM && step.mCoefTableau && Math.abs(step.mCoefTableau[tr][j]) > 1e-9)
+                cell.classList.add('granm-cell');
+              else cell.classList.remove('granm-cell');
+              cell.classList.remove('blink-update');
+            }, BLINK_DUR / 2);
+          }
+        }
+
+        // Update Z display
+        const zVal = step.tableau[m][cols - 1];
+        const zMc = step.mCoefTableau ? step.mCoefTableau[m][cols - 1] : 0;
+        const zEl = document.getElementById(`zval_${idx}`);
+        if (zEl) zEl.textContent = useGranM && Math.abs(zMc) > 1e-9
+          ? fmtGranM(-zVal, -zMc)
+          : formatNum(-zVal);
+
+        setTimeout(() => {
+          if (pivotRowEl) pivotRowEl.classList.remove('highlight-blue');
+          if (targetRowEl) targetRowEl.classList.remove('highlight-gray');
+          finishAnim();
+        }, BLINK_DUR + 300);
+      }, ANIM_DUR);
+    }, DELAY);
+  }
+}
+
+function finishAnim() {
+  animating = false;
+  const isLast = currentStepIdx === steps.length - 1;
+  if (!isLast) document.getElementById('btnNext').disabled = false;
+}
+
+// ============================================================
+//  SOLUTION DISPLAY
+// ============================================================
+function renderSolution(step, idx) {
+  const solEl = document.getElementById(`solution_${idx}`);
+
+  if (step.type === 'unbounded') {
+    solEl.innerHTML = `<div class="error-box">⚠ El problema es no acotado — no existe solución óptima finita.</div>`;
+    return;
+  }
+
+  const { tableau, basis, allVars } = step;
+  const m = tableau.length - 1;
+  const totalCols = allVars.length + 1;
+  const zVal = -getZValue(tableau, m);
+
+  const sol = {};
+  for (let i = 0; i < m; i++) {
+    sol[basis[i]] = formatNum(tableau[i][totalCols - 1]);
+  }
+
+  const varLines = problem.vars.map(v => {
+    const val = sol[v] !== undefined ? sol[v] : '0';
+    return `<div><span style="color:var(--accent)">${v}</span> = <span class="sol-val">${val}</span></div>`;
+  }).join('');
+
+  solEl.innerHTML = `
+    <div class="solution-box">
+      <div class="sol-title">Solución Óptima</div>
+      ${varLines}
+      <div style="margin-top:8px;border-top:1px solid #86efac;padding-top:8px">
+        <span style="color:var(--text-muted)">Z${optType==='max'?' (max)':' (min)'} =</span>
+        <span class="sol-val" style="font-size:16px"> ${formatNum(zVal)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderFinalGraph(step) {
+  if (!problem || problem.vars.length > 2) return;
+
+  const { tableau, basis, allVars } = step;
+  if (step.type !== 'optimal') return;
+
+  const m = tableau.length - 1;
+  const totalCols = allVars.length + 1;
+
+  const sol = {};
+  for (let i = 0; i < m; i++) {
+    sol[basis[i]] = tableau[i][totalCols - 1];
+  }
+  problem.vars.forEach(v => { if (sol[v] === undefined) sol[v] = 0; });
+
+  document.getElementById('graphFinal').style.display = 'block';
+  setTimeout(() => {
+    drawGraph('canvasFinal', problem.constraints, problem.vars, sol, problem.objCoeffs, 'legendFinal');
+    document.getElementById('graphFinal').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 600);
+}
+
+// ============================================================
+//  BRANCH AND BOUND
+// ============================================================
+
+function toggleIntegerMode() {
+  integerMode = !integerMode;
+  const btn = document.getElementById('btnInteger');
+  btn.classList.toggle('is-on', integerMode);
+  btn.textContent = integerMode ? '𝐙 Enteros: ON' : '𝐙 Enteros';
+}
+
+function solveBranchAndBound(prob) {
+  let nodeCounter = 0;
+  let bestValue = prob.optType === 'max' ? -Infinity : Infinity;
+  let bestSolution = null;
+  const bbSteps = [];
+  const nodes = {};
+
+  function createNode(parentId, extraConstraints, label) {
+    const id = nodeCounter++;
+    const parentExtra = parentId !== null ? nodes[parentId].extraConstraints : [];
+    nodes[id] = {
+      id, parentId,
+      extraConstraints: [...parentExtra, ...extraConstraints],
+      status: 'pending',
+      lpValue: null,
+      solution: null,
+      branchVar: null,
+      branchVal: null,
+      children: [],
+      label
+    };
+    if (parentId !== null) nodes[parentId].children.push(id);
+    return id;
+  }
+
+  function solveNodeLP(nodeId) {
+    const node = nodes[nodeId];
+    const nodeProblem = {
+      ...prob,
+      constraints: [...prob.constraints, ...node.extraConstraints]
+    };
+    const needsGranM = nodeProblem.constraints.some(c => c.type !== '<=');
+    const result = solveSimplex(nodeProblem, needsGranM);
+    const lastStep = result.steps[result.steps.length - 1];
+
+    if (lastStep.type === 'unbounded' || lastStep.type !== 'optimal') {
+      node.status = 'infeasible';
+      return;
+    }
+
+    const { tableau, basis, allVars } = lastStep;
+    const m = tableau.length - 1;
+    const totalCols = allVars.length + 1;
+
+    // Gran M: if any artificial remains in basis with value > 0 → infeasible
+    const artificialInBasis = basis.some((b, i) => b.startsWith('a') && tableau[i][totalCols - 1] > 1e-6);
+    if (artificialInBasis) { node.status = 'infeasible'; return; }
+
+    const sol = {};
+    for (let i = 0; i < m; i++) sol[basis[i]] = tableau[i][totalCols - 1];
+    prob.vars.forEach(v => { if (sol[v] === undefined) sol[v] = 0; });
+
+    const zVal = -getZValue(tableau, m);
+    node.lpValue = zVal;
+    node.solution = sol;
+
+    const hasBest = isFinite(bestValue);
+    const isBetter = prob.optType === 'max' ? zVal > bestValue : zVal < bestValue;
+
+    if (hasBest && !isBetter) { node.status = 'pruned'; return; }
+
+    const fractVar = prob.vars.find(v => Math.abs((sol[v] || 0) - Math.round(sol[v] || 0)) > 1e-6);
+    if (!fractVar) {
+      node.status = 'integer';
+      if (!hasBest || isBetter) { bestValue = zVal; bestSolution = { ...sol }; }
+    } else {
+      node.status = 'branch';
+      node.branchVar = fractVar;
+      node.branchVal = sol[fractVar];
+    }
+  }
+
+  const rootId = createNode(null, [], null);
+  const stack = [rootId];
+  const MAX_NODES = 31;
+
+  while (stack.length > 0 && nodeCounter <= MAX_NODES) {
+    const nodeId = stack.pop();
+    solveNodeLP(nodeId);
+    const node = nodes[nodeId];
+
+    bbSteps.push({
+      type: 'bb_node',
+      nodeId,
+      node: JSON.parse(JSON.stringify(node)),
+      nodesSnapshot: JSON.parse(JSON.stringify(nodes)),
+      bestValue: isFinite(bestValue) ? bestValue : null,
+      bestSolution: bestSolution ? { ...bestSolution } : null
+    });
+
+    if (node.status === 'branch') {
+      const fv = node.branchVar;
+      const floorVal = Math.floor(node.branchVal);
+      const ceilVal  = Math.ceil(node.branchVal);
+      // Push ceil first so floor is explored first (DFS)
+      const ceilId  = createNode(nodeId, [{ lhs: { [fv]: 1 }, type: '>=', rhs: ceilVal }],  `${fv} ≥ ${ceilVal}`);
+      const floorId = createNode(nodeId, [{ lhs: { [fv]: 1 }, type: '<=', rhs: floorVal }], `${fv} ≤ ${floorVal}`);
+      stack.push(ceilId);
+      stack.push(floorId);
+    }
+  }
+
+  bbSteps.push({
+    type: 'bb_final',
+    nodesSnapshot: JSON.parse(JSON.stringify(nodes)),
+    bestValue: isFinite(bestValue) ? bestValue : null,
+    bestSolution
+  });
+
+  return { bbSteps, bestValue: isFinite(bestValue) ? bestValue : null, bestSolution };
+}
+
+function drawBBTree(nodesSnapshot, canvasId, currentNodeId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const NODE_W = 124, NODE_H = 56, H_GAP = 18, V_GAP = 70, PAD = 28;
+
+  const ids = Object.keys(nodesSnapshot).map(Number).sort((a, b) => a - b);
+  if (!ids.length) { canvas.width = 420; canvas.height = 100; ctx.clearRect(0, 0, 420, 100); return; }
+
+  const rootId = ids.find(id => nodesSnapshot[id].parentId === null);
+  if (rootId === undefined) return;
+
+  function subtreeWidth(id) {
+    const n = nodesSnapshot[id];
+    if (!n.children || !n.children.length) return NODE_W;
+    const cw = n.children.reduce((s, c) => s + subtreeWidth(c), 0);
+    return Math.max(NODE_W, cw + H_GAP * (n.children.length - 1));
+  }
+
+  const positions = {};
+  function layout(id, x, y) {
+    const n = nodesSnapshot[id];
+    const sw = subtreeWidth(id);
+    positions[id] = { x: x + sw / 2, y };
+    let cx = x;
+    for (const cid of (n.children || [])) {
+      layout(cid, cx, y + NODE_H + V_GAP);
+      cx += subtreeWidth(cid) + H_GAP;
+    }
+  }
+  layout(rootId, PAD, PAD);
+
+  const xs = Object.values(positions).map(p => p.x);
+  const ys = Object.values(positions).map(p => p.y);
+  canvas.width  = Math.max(420, Math.max(...xs) + NODE_W / 2 + PAD);
+  canvas.height = Math.max(160, Math.max(...ys) + NODE_H + PAD);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Edges
+  for (const id of ids) {
+    const n = nodesSnapshot[id];
+    const pos = positions[id];
+    if (!pos) continue;
+    for (const cid of (n.children || [])) {
+      const cpos = positions[cid];
+      if (!cpos) continue;
+      ctx.strokeStyle = '#c9c6bc'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y + NODE_H);
+      ctx.lineTo(cpos.x, cpos.y);
+      ctx.stroke();
+      const child = nodesSnapshot[cid];
+      if (child && child.label) {
+        ctx.fillStyle = '#9c9890';
+        ctx.font = '10px DM Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(child.label, (pos.x + cpos.x) / 2, (pos.y + NODE_H + cpos.y) / 2 - 2);
+      }
+    }
+  }
+
+  // Nodes
+  const SC = {
+    pending:    { bg: '#f5f4f0', bd: '#d0cdc4', tx: '#7a7870' },
+    branch:     { bg: '#dbeafe', bd: '#93c5fd', tx: '#1d4ed8' },
+    integer:    { bg: '#dcfce7', bd: '#86efac', tx: '#15803d' },
+    infeasible: { bg: '#fee2e2', bd: '#fca5a5', tx: '#b91c1c' },
+    pruned:     { bg: '#fef9c3', bd: '#fde047', tx: '#854d0e' }
+  };
+
+  for (const id of ids) {
+    const n = nodesSnapshot[id];
+    const pos = positions[id];
+    if (!pos) continue;
+    const isCur = id === currentNodeId;
+    const c = SC[n.status] || SC.pending;
+    const x = pos.x - NODE_W / 2, y = pos.y;
+
+    ctx.fillStyle = isCur ? '#bfdbfe' : c.bg;
+    ctx.strokeStyle = isCur ? '#2563eb' : c.bd;
+    ctx.lineWidth = isCur ? 2.5 : 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, NODE_W, NODE_H, 7);
+    else ctx.rect(x, y, NODE_W, NODE_H);
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = isCur ? '#1e40af' : c.tx;
+    ctx.font = 'bold 11px DM Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Nodo ${id}`, pos.x, y + 17);
+
+    ctx.font = '10px DM Mono, monospace';
+    ctx.fillStyle = c.tx;
+    const line2 = n.status === 'infeasible' ? 'No factible'
+      : n.status === 'pruned'    ? `Podado  Z=${n.lpValue !== null ? formatNum(n.lpValue) : '—'}`
+      : n.lpValue !== null       ? `Z = ${formatNum(n.lpValue)}`
+      : '…';
+    ctx.fillText(line2, pos.x, y + 33);
+
+    const icon = { integer: '✓', infeasible: '✗', pruned: '✄', branch: '↓' }[n.status] || '';
+    if (icon) { ctx.font = '12px sans-serif'; ctx.fillText(icon, pos.x, y + 49); }
+  }
+}
+
+function renderBBStep(step, idx) {
+  const section = document.getElementById('stepsSection');
+  if (document.getElementById(`step_${idx}`)) return;
+
+  const card = document.createElement('div');
+  card.className = 'step-card';
+  card.id = `step_${idx}`;
+
+  if (step.type === 'bb_node') {
+    const node = step.node;
+    const statusLabel = {
+      integer:    '✓ Solución entera',
+      infeasible: '✗ No factible — podado',
+      pruned:     '✄ Podado por cota',
+      branch:     '↓ Ramificar'
+    }[node.status] || node.status;
+
+    const statusCls = {
+      integer: 'status-optimal', infeasible: 'status-infeasible',
+      pruned: 'status-pruned',   branch: 'status-branch'
+    }[node.status] || '';
+
+    const constraintStr = node.extraConstraints.length
+      ? 'Restricciones adicionales: ' + node.extraConstraints.map(c => {
+          const v = Object.keys(c.lhs)[0];
+          return `${v} ${c.type === '<=' ? '≤' : c.type === '>=' ? '≥' : '='} ${formatNum(c.rhs)}`;
+        }).join(', ')
+      : 'Relajación LP raíz';
+
+    const solLine = node.solution
+      ? `<div class="bb-sol-line">${problem.vars.map(v => `${v} = ${formatNum(node.solution[v] || 0)}`).join(' &nbsp;|&nbsp; ')}</div>`
+      : '';
+
+    const incLine = step.bestSolution
+      ? `<div class="bb-incumbent">Mejor entera: Z = ${formatNum(step.bestValue)} &nbsp;(${problem.vars.map(v => `${v}=${formatNum(step.bestSolution[v] || 0)}`).join(', ')})</div>`
+      : '';
+
+    const zHtml = node.lpValue !== null
+      ? `<div class="z-display" style="margin:0;display:inline-block;padding:6px 14px">Z relaj. = <span class="val">${formatNum(node.lpValue)}</span></div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="step-header">
+        <span class="step-badge">Nodo ${node.id}</span>
+        <span class="step-desc">${constraintStr}</span>
+      </div>
+      <div class="bb-status-row">
+        <span class="status-badge ${statusCls}">${statusLabel}</span>${zHtml}
+      </div>
+      ${solLine}${incLine}
+    `;
+  } else if (step.type === 'bb_final') {
+    if (step.bestSolution) {
+      const varLines = problem.vars.map(v =>
+        `<div><span style="color:var(--accent)">${v}</span> = <span class="sol-val">${formatNum(Math.round(step.bestSolution[v] || 0))}</span></div>`
+      ).join('');
+      card.innerHTML = `
+        <div class="step-header">
+          <span class="step-badge" style="background:#dcfce7;color:#15803d;border-color:#86efac">Solución Óptima Entera</span>
+          <span class="step-desc">✓ Branch and Bound completado</span>
+        </div>
+        <div class="solution-box">
+          <div class="sol-title">Solución Entera Óptima</div>
+          ${varLines}
+          <div style="margin-top:8px;border-top:1px solid #86efac;padding-top:8px">
+            <span style="color:var(--text-muted)">Z${optType === 'max' ? ' (max)' : ' (min)'} =</span>
+            <span class="sol-val" style="font-size:16px"> ${formatNum(step.bestValue)}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="step-header"><span class="step-badge">Sin Solución</span></div>
+        <div class="error-box">⚠ No se encontró solución entera factible.</div>
+      `;
+    }
+  }
+
+  section.appendChild(card);
+  // Update tree canvas with current exploration state
+  document.getElementById('bbTreeSection').style.display = 'block';
+  drawBBTree(step.nodesSnapshot, 'canvasBBTree', step.type === 'bb_node' ? step.nodeId : null);
+}
+
+// ============================================================
+//  RESET
+// ============================================================
+function resetAll() {
+  steps = [];
+  currentStepIdx = -1;
+  animating = false;
+  problem = null;
+  fastMode = false;
+  bbResult = null;
+
+  document.getElementById('stepsSection').innerHTML = '';
+  document.getElementById('inputSection').style.display = 'block';
+  document.getElementById('graphInitial').style.display = 'none';
+  document.getElementById('graphFinal').style.display = 'none';
+  document.getElementById('bbTreeSection').style.display = 'none';
+  document.getElementById('btnSolve').style.display = 'inline-flex';
+  document.getElementById('methodToggle').style.display = 'flex';
+  document.getElementById('btnInteger').style.display = 'inline-flex';
+  document.getElementById('btnNext').style.display = 'none';
+  document.getElementById('btnReset').style.display = 'none';
+  document.getElementById('btnFast').style.display = 'none';
+  document.getElementById('btnFast').classList.remove('is-on');
+  document.getElementById('btnFast').textContent = '⚡ Modo Rápido';
+  document.getElementById('stepCounter').style.display = 'none';
+  document.getElementById('btnNext').textContent = 'Siguiente ▶';
+  document.getElementById('btnNext').disabled = false;
+  document.body.classList.remove('fast-mode');
+}
+</script>
+</body>
+</html>

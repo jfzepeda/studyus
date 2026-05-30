@@ -259,6 +259,39 @@ const limpiarCanvas = tool({
   },
 });
 
+const profundizar = tool({
+  name: "profundizar",
+  description:
+    "Entra (hace zoom) DENTRO de un tema del mapa para explicarlo en detalle. Llámalo SOLO cuando el estudiante pida explícitamente profundizar en un tema (p. ej. 'profundiza en X', 'entremos a X', 'cuéntame más de X'). Después, los recursos que crees quedarán anidados dentro de ese tema automáticamente. Si el tema aún no existe en el canvas, créalo primero con la herramienta adecuada y luego llama a esta.",
+  parameters: z.object({
+    id: idField,
+    titulo: z
+      .string()
+      .describe("Título corto del tema; se usa para crearlo si todavía no está en el canvas."),
+  }),
+  execute: async ({ id, titulo }) => {
+    const store = useCanvasStore.getState();
+    // Tope de 2 niveles: si ya estás dentro de otro tema, sal antes de entrar al nuevo.
+    if (store.activeParentId && store.activeParentId !== id) store.exitDepth();
+    if (!store.elements.some((e) => e.id === id)) {
+      store.upsertElement({ id, kind: "card", titulo, markdown: `# ${titulo}` });
+    }
+    store.enterDepth(id);
+    return `Ahora estás DENTRO del tema "${titulo}" (id: ${id}). Crea 2-4 recursos de detalle finos sobre este tema (se anidan solos), conéctalos entre sí y, si ayuda, añade un quiz. Habla breve. Cuando el estudiante quiera salir, llama a 'alejar'.`;
+  },
+});
+
+const alejar = tool({
+  name: "alejar",
+  description:
+    "Vuelve (hace zoom out) a la vista general del mapa de temas. Úsalo cuando el estudiante diga 'aléjate', 'volvamos', 'sal' o 'regresa'.",
+  parameters: z.object({}),
+  execute: async () => {
+    useCanvasStore.getState().exitDepth();
+    return "Volviste a la vista general del mapa de temas.";
+  },
+});
+
 const INSTRUCTIONS = `Eres un tutor visual en español. Enseñas cualquier tema construyendo un MAPA DE CONOCIMIENTO en un canvas (un grafo) mientras conversas.
 
 REGLA PRINCIPAL: además de hablar, SIEMPRE usa tus herramientas para poner lo importante en el canvas. Cada explicación debe dejar algo visual.
@@ -279,6 +312,8 @@ Cómo enseñar bien:
 4. COMPRUEBA la comprensión: de vez en cuando usa 'crear_quiz' con una pregunta de opción múltiple, pregúntasela al estudiante EN VOZ ALTA y espera su respuesta hablada. Cuando responda, llama a 'revelar_respuesta' con el id del quiz y dale feedback breve (acertó o no, y por qué).
 5. Habla de forma cálida, clara y BREVE (1-2 frases por turno). El detalle va en el canvas, no en tu voz.
 6. Si el estudiante no propone tema, pregúntale qué quiere aprender y a qué nivel.
+
+PROFUNDIZAR (zoom de dos niveles): Sigue enseñando como siempre en el mapa general. SOLO cuando el estudiante pida explícitamente profundizar en un tema ("profundiza en X", "entremos a X", "cuéntame más de X"), llama a 'profundizar' con el id de ese tema; después crea 2-4 recursos de DETALLE finos (se anidan dentro del tema automáticamente) y conéctalos entre sí, hablando breve. Cuando el estudiante diga "aléjate", "volvamos", "sal" o "regresa", llama a 'alejar' para volver al mapa. NUNCA profundices por tu cuenta: quédate en el mapa general hasta que el estudiante lo pida.
 
 Ejemplo de Mermaid válido:
 flowchart TD
@@ -304,6 +339,8 @@ export function createTutorAgent() {
       revelarRespuesta,
       conectar,
       resaltar,
+      profundizar,
+      alejar,
       limpiarCanvas,
     ],
   });

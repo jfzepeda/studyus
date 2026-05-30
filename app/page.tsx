@@ -1,6 +1,7 @@
 "use client";
 
 import { Canvas } from "@/components/Canvas";
+import { DepthBreadcrumb } from "@/components/DepthBreadcrumb";
 import { MicOrb } from "@/components/MicOrb";
 import { MuteButton } from "@/components/MuteButton";
 import { Transcript } from "@/components/Transcript";
@@ -59,7 +60,8 @@ export default function Home() {
         </div>
       )}
 
-      <section className="min-h-0 flex-1">
+      <section className="relative min-h-0 flex-1">
+        <DepthBreadcrumb />
         <Canvas />
       </section>
     </main>
