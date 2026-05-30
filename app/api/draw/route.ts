@@ -4,30 +4,22 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Extrae el texto de una respuesta de la Responses API (tolerante a ambas formas).
+// Extrae el texto de una respuesta de la Messages API de Anthropic.
 function extractText(data: unknown): string {
-  const d = data as { output_text?: unknown; output?: unknown };
-  if (typeof d.output_text === "string" && d.output_text.trim()) {
-    return d.output_text;
-  }
-  const out = Array.isArray(d.output) ? d.output : [];
+  const content = (data as { content?: unknown }).content;
+  if (!Array.isArray(content)) return "";
   let text = "";
-  for (const item of out) {
-    const content = (item as { content?: unknown }).content;
-    if (Array.isArray(content)) {
-      for (const c of content) {
-        const t = (c as { text?: unknown }).text;
-        if (typeof t === "string") text += t;
-      }
-    }
+  for (const c of content) {
+    const block = c as { type?: unknown; text?: unknown };
+    if (block.type === "text" && typeof block.text === "string") text += block.text;
   }
   return text;
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "Falta OPENAI_API_KEY." }, { status: 500 });
+    return NextResponse.json({ error: "Falta ANTHROPIC_API_KEY." }, { status: 500 });
   }
 
   let descripcion = "";
@@ -40,7 +32,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Falta 'descripcion'." }, { status: 400 });
   }
 
-  const prompt = `Genera un SVG educativo, detallado y atractivo que ilustre: "${descripcion}".
+  const system = `Eres un especialista que dibuja SVG educativos, detallados y atractivos a partir de una descripción.
 
 Requisitos estrictos:
 - Devuelve SOLO el código SVG: empieza con <svg ...> y termina con </svg>. Sin markdown, sin explicaciones, sin comillas alrededor.
@@ -53,17 +45,22 @@ Requisitos estrictos:
 - Prohibido: <script>, <foreignObject>, manejadores on*.`;
 
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
-        input: prompt,
-        reasoning: { effort: "minimal" },
-        max_output_tokens: 12000,
+        model: "claude-haiku-4-5",
+        max_tokens: 4096,
+        system: [
+          { type: "text", text: system, cache_control: { type: "ephemeral" } },
+        ],
+        messages: [
+          { role: "user", content: `Genera el SVG que ilustre: "${descripcion}".` },
+        ],
       }),
     });
 
