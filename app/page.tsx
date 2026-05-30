@@ -32,14 +32,19 @@ export default function Home() {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Canvas que habla
+            Study.us
           </h1>
           <p className="text-sm text-slate-400">
-            Háblale y aprende cualquier tema con recursos visuales en vivo.
+            Aprende sobre cualquier tema charlando con nuestro canvas
+            interactivo.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <MicOrb status={status} onConnect={connect} onDisconnect={disconnect} />
+          <MicOrb
+            status={status}
+            onConnect={connect}
+            onDisconnect={disconnect}
+          />
           {sessionActive && <MuteButton muted={muted} onToggle={toggleMute} />}
           <button
             type="button"
