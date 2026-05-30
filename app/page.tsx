@@ -15,7 +15,7 @@ export default function Home() {
   const sessionActive = status !== "idle" && status !== "connecting";
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6">
+    <main className="mx-auto flex h-screen max-w-7xl flex-col overflow-hidden px-4 py-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
@@ -50,7 +50,7 @@ export default function Home() {
         </div>
       )}
 
-      <section className="flex-1">
+      <section className="min-h-0 flex-1">
         <Canvas />
       </section>
     </main>

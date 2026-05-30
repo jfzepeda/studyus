@@ -9,6 +9,13 @@ export type CardElement = {
   markdown: string;
 };
 
+export type FormulaElement = {
+  id: string;
+  kind: "formula";
+  titulo: string;
+  latex: string;
+};
+
 export type DiagramElement = {
   id: string;
   kind: "diagram";
@@ -24,32 +31,108 @@ export type ChartElement = {
   data: { label: string; value: number }[];
 };
 
-export type CanvasElement = CardElement | DiagramElement | ChartElement;
+export type DrawingElement = {
+  id: string;
+  kind: "drawing";
+  titulo: string;
+  svg: string;
+};
 
-/** Omit que se distribuye sobre la unión (Omit normal colapsa a las claves comunes). */
-type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
+export type QuizElement = {
+  id: string;
+  kind: "quiz";
+  titulo: string;
+  pregunta: string;
+  opciones: string[];
+  correcta: number; // índice 0-based de la opción correcta
+  explicacion: string;
+  revelada: boolean;
+  elegida: number | null; // qué opción eligió el estudiante (si lo hizo)
+};
 
-export type NewCanvasElement = DistributiveOmit<CanvasElement, "id">;
+export type CanvasElement =
+  | CardElement
+  | FormulaElement
+  | DiagramElement
+  | ChartElement
+  | DrawingElement
+  | QuizElement;
 
-let counter = 0;
-function nextId(): string {
-  counter += 1;
-  return `el-${counter}`;
-}
+export type CanvasEdge = {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+};
+
+let edgeCounter = 0;
 
 interface CanvasState {
   elements: CanvasElement[];
-  /** Agrega un elemento al canvas y devuelve su id. */
-  addElement: (el: NewCanvasElement) => string;
+  edges: CanvasEdge[];
+  highlightedId: string | null;
+  /** Se incrementa con cada cambio estructural para disparar el re-layout del grafo. */
+  version: number;
+  /** Se incrementa cuando queremos que la cámara se centre en `highlightedId`. */
+  focusTick: number;
+
+  /** Inserta o reemplaza (por id) un elemento del canvas. */
+  upsertElement: (el: CanvasElement) => void;
+  /** Conecta dos elementos existentes con una arista etiquetada. */
+  connect: (source: string, target: string, label: string) => void;
+  /** Resalta un elemento y mueve la cámara hacia él (lo usa la herramienta `resaltar`). */
+  highlightNode: (id: string) => void;
+  /** Revela la respuesta de un quiz; `elegida` es la opción que tocó el estudiante. */
+  revealQuiz: (id: string, elegida?: number | null) => void;
   clear: () => void;
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
   elements: [],
-  addElement: (el) => {
-    const id = nextId();
-    set((state) => ({ elements: [...state.elements, { ...el, id } as CanvasElement] }));
-    return id;
-  },
-  clear: () => set({ elements: [] }),
+  edges: [],
+  highlightedId: null,
+  version: 0,
+  focusTick: 0,
+
+  upsertElement: (el) =>
+    set((state) => {
+      const idx = state.elements.findIndex((e) => e.id === el.id);
+      const elements =
+        idx >= 0
+          ? state.elements.map((e, i) => (i === idx ? el : e))
+          : [...state.elements, el];
+      return { elements, version: state.version + 1, highlightedId: el.id };
+    }),
+
+  connect: (source, target, label) =>
+    set((state) => {
+      const exists = state.elements.some((e) => e.id === source) &&
+        state.elements.some((e) => e.id === target);
+      if (!exists) return state;
+      edgeCounter += 1;
+      const edge: CanvasEdge = {
+        id: `edge-${edgeCounter}`,
+        source,
+        target,
+        label,
+      };
+      return { edges: [...state.edges, edge], version: state.version + 1 };
+    }),
+
+  highlightNode: (id) =>
+    set((state) => ({ highlightedId: id, focusTick: state.focusTick + 1 })),
+
+  revealQuiz: (id, elegida = null) =>
+    set((state) => ({
+      elements: state.elements.map((e) =>
+        e.id === id && e.kind === "quiz"
+          ? { ...e, revelada: true, elegida: elegida ?? e.elegida }
+          : e,
+      ),
+      version: state.version + 1,
+      highlightedId: id,
+      focusTick: state.focusTick + 1,
+    })),
+
+  clear: () => set((state) => ({ elements: [], edges: [], highlightedId: null, version: state.version + 1 })),
 }));

@@ -2,51 +2,76 @@ import { RealtimeAgent, tool } from "@openai/agents-realtime";
 import { z } from "zod";
 import { useCanvasStore } from "./store";
 
+const idField = z
+  .string()
+  .describe(
+    "id corto y único en minúsculas, sin espacios ni tildes (ej. 'ciclo_agua'). Reúsalo después para conectar, resaltar o (si es quiz) revelar este elemento.",
+  );
+
 const crearTarjeta = tool({
   name: "crear_tarjeta",
   description:
-    "Crea una tarjeta de texto en el canvas con una idea clave, definición, lista de puntos o fórmula. Úsala para resumir conceptos.",
+    "Crea una tarjeta de texto con una idea clave, definición o lista. Puede incluir LaTeX inline entre $...$.",
   parameters: z.object({
+    id: idField,
     titulo: z.string().describe("Título corto de la tarjeta (3-6 palabras)."),
     contenido_markdown: z
       .string()
-      .describe(
-        "Contenido en Markdown (encabezados, listas, **negritas**). Para fórmulas matemáticas usa LaTeX entre signos de dólar, por ejemplo $E = mc^2$.",
-      ),
+      .describe("Contenido en Markdown (encabezados, listas, **negritas**, $LaTeX$ inline)."),
   }),
-  execute: async ({ titulo, contenido_markdown }) => {
-    useCanvasStore.getState().addElement({
+  execute: async ({ id, titulo, contenido_markdown }) => {
+    useCanvasStore.getState().upsertElement({
+      id,
       kind: "card",
       titulo,
       markdown: contenido_markdown,
     });
-    return "Tarjeta creada en el canvas.";
+    return `Tarjeta creada (id: ${id}).`;
+  },
+});
+
+const crearFormula = tool({
+  name: "crear_formula",
+  description:
+    "Muestra una fórmula matemática destacada, grande y centrada. Úsala cuando la fórmula sea el protagonista.",
+  parameters: z.object({
+    id: idField,
+    titulo: z.string().describe("Nombre de la fórmula, p. ej. 'Energía cinética'."),
+    latex: z
+      .string()
+      .describe("La fórmula en LaTeX, SIN signos de dólar. Ejemplo: E_k = \\frac{1}{2}mv^2"),
+  }),
+  execute: async ({ id, titulo, latex }) => {
+    useCanvasStore.getState().upsertElement({ id, kind: "formula", titulo, latex });
+    return `Fórmula creada (id: ${id}).`;
   },
 });
 
 const crearDiagrama = tool({
   name: "crear_diagrama",
   description:
-    "Crea un diagrama o mapa mental en el canvas usando código Mermaid. Úsalo para procesos, ciclos, jerarquías o relaciones entre conceptos.",
+    "Crea un diagrama o mapa mental con código Mermaid (procesos, ciclos, jerarquías).",
   parameters: z.object({
+    id: idField,
     titulo: z.string().describe("Título corto del diagrama."),
     mermaid: z
       .string()
       .describe(
-        "Código Mermaid válido y simple. Prefiere 'flowchart TD' o 'mindmap'. Usa etiquetas cortas sin caracteres especiales raros.",
+        "Código Mermaid válido y simple. Prefiere 'flowchart TD' o 'mindmap'. Etiquetas cortas sin tildes ni símbolos raros.",
       ),
   }),
-  execute: async ({ titulo, mermaid }) => {
-    useCanvasStore.getState().addElement({ kind: "diagram", titulo, mermaid });
-    return "Diagrama creado en el canvas.";
+  execute: async ({ id, titulo, mermaid }) => {
+    useCanvasStore.getState().upsertElement({ id, kind: "diagram", titulo, mermaid });
+    return `Diagrama creado (id: ${id}).`;
   },
 });
 
 const crearGrafico = tool({
   name: "crear_grafico",
   description:
-    "Crea un gráfico de datos en el canvas. Úsalo cuando haya cantidades, comparaciones o proporciones que mostrar.",
+    "Crea un gráfico de datos (barras, líneas o pastel) cuando haya cantidades o comparaciones.",
   parameters: z.object({
+    id: idField,
     titulo: z.string().describe("Título corto del gráfico."),
     tipo: z.enum(["bar", "line", "pie"]).describe("Tipo de gráfico."),
     data: z
@@ -58,15 +83,110 @@ const crearGrafico = tool({
       )
       .describe("Entre 2 y 8 puntos de datos."),
   }),
-  execute: async ({ titulo, tipo, data }) => {
-    useCanvasStore.getState().addElement({ kind: "chart", titulo, tipo, data });
-    return "Gráfico creado en el canvas.";
+  execute: async ({ id, titulo, tipo, data }) => {
+    useCanvasStore.getState().upsertElement({ id, kind: "chart", titulo, tipo, data });
+    return `Gráfico creado (id: ${id}).`;
+  },
+});
+
+const crearDibujo = tool({
+  name: "crear_dibujo",
+  description:
+    "Dibuja una ilustración vectorial con SVG (el Sol, un átomo, una célula, figuras geométricas).",
+  parameters: z.object({
+    id: idField,
+    titulo: z.string().describe("Título corto del dibujo."),
+    svg: z
+      .string()
+      .describe(
+        "Código SVG completo desde <svg ...> hasta </svg>. Incluye SIEMPRE un viewBox, formas simples y colores vivos. Sin <script>.",
+      ),
+  }),
+  execute: async ({ id, titulo, svg }) => {
+    useCanvasStore.getState().upsertElement({ id, kind: "drawing", titulo, svg });
+    return `Dibujo creado (id: ${id}).`;
+  },
+});
+
+const crearQuiz = tool({
+  name: "crear_quiz",
+  description:
+    "Crea una pregunta de opción múltiple para comprobar la comprensión (recuperación activa). Después pregúntasela al estudiante en voz alta y espera su respuesta hablada.",
+  parameters: z.object({
+    id: idField,
+    titulo: z.string().describe("Título corto, p. ej. 'Comprueba lo que sabes'."),
+    pregunta: z.string().describe("El enunciado de la pregunta."),
+    opciones: z.array(z.string()).describe("Entre 2 y 4 opciones de respuesta."),
+    correcta: z
+      .number()
+      .int()
+      .describe("Índice (empezando en 0) de la opción correcta."),
+    explicacion: z
+      .string()
+      .describe("Explicación breve de por qué esa es la respuesta correcta."),
+  }),
+  execute: async ({ id, titulo, pregunta, opciones, correcta, explicacion }) => {
+    useCanvasStore.getState().upsertElement({
+      id,
+      kind: "quiz",
+      titulo,
+      pregunta,
+      opciones,
+      correcta,
+      explicacion,
+      revelada: false,
+      elegida: null,
+    });
+    return `Quiz creado (id: ${id}). Pregúntaselo al estudiante en voz alta.`;
+  },
+});
+
+const revelarRespuesta = tool({
+  name: "revelar_respuesta",
+  description:
+    "Revela la respuesta correcta de un quiz. Llámalo DESPUÉS de que el estudiante haya respondido en voz, y dale feedback hablado (si acertó o no, y por qué).",
+  parameters: z.object({
+    id: z.string().describe("El id del quiz a revelar."),
+  }),
+  execute: async ({ id }) => {
+    useCanvasStore.getState().revealQuiz(id);
+    return "Respuesta revelada.";
+  },
+});
+
+const conectar = tool({
+  name: "conectar",
+  description:
+    "Conecta dos elementos del canvas con una flecha etiquetada, para construir un mapa conceptual que muestra cómo se relacionan las ideas.",
+  parameters: z.object({
+    origen: z.string().describe("id del elemento de origen."),
+    destino: z.string().describe("id del elemento de destino."),
+    etiqueta: z
+      .string()
+      .describe("Relación breve, p. ej. 'causa', 'se divide en', 'lleva a'."),
+  }),
+  execute: async ({ origen, destino, etiqueta }) => {
+    useCanvasStore.getState().connect(origen, destino, etiqueta);
+    return "Conexión creada.";
+  },
+});
+
+const resaltar = tool({
+  name: "resaltar",
+  description:
+    "Resalta un elemento y centra la cámara en él. Úsalo MIENTRAS hablas para señalar de qué elemento estás hablando, como un profesor que apunta a la pizarra.",
+  parameters: z.object({
+    id: z.string().describe("El id del elemento a resaltar."),
+  }),
+  execute: async ({ id }) => {
+    useCanvasStore.getState().highlightNode(id);
+    return "Elemento resaltado.";
   },
 });
 
 const limpiarCanvas = tool({
   name: "limpiar_canvas",
-  description: "Borra todos los elementos del canvas. Úsalo cuando el usuario pida empezar de nuevo o limpiar.",
+  description: "Borra todos los elementos y conexiones del canvas.",
   parameters: z.object({}),
   execute: async () => {
     useCanvasStore.getState().clear();
@@ -74,41 +194,50 @@ const limpiarCanvas = tool({
   },
 });
 
-const INSTRUCTIONS = `Eres un tutor visual en español. Tu trabajo es enseñar cualquier tema poblando un canvas con recursos gráficos mientras conversas.
+const INSTRUCTIONS = `Eres un tutor visual en español. Enseñas cualquier tema construyendo un MAPA DE CONOCIMIENTO en un canvas (un grafo) mientras conversas.
 
-REGLA PRINCIPAL: además de hablar, SIEMPRE usa tus herramientas para poner lo importante en el canvas. No te limites a responder en voz; cada explicación debe dejar algo visual.
+REGLA PRINCIPAL: además de hablar, SIEMPRE usa tus herramientas para poner lo importante en el canvas. Cada explicación debe dejar algo visual.
 
-Cómo trabajar:
-- Habla de forma cálida, clara y BREVE (1 o 2 frases por turno). El detalle va en las tarjetas y diagramas, no en tu voz.
-- Elige la herramienta adecuada:
-  - crear_tarjeta: para definiciones, ideas clave, listas o fórmulas (usa LaTeX entre $...$).
-  - crear_diagrama: para procesos, ciclos, jerarquías o relaciones (código Mermaid).
-  - crear_grafico: cuando haya datos, cantidades o comparaciones.
-  - limpiar_canvas: cuando pidan empezar de nuevo.
-- Puedes usar varias herramientas en un mismo turno para cubrir un tema desde varios ángulos.
-- Si el usuario no pide un tema concreto, sugiérele uno o pregúntale qué quiere aprender.
+Identificadores:
+- Cada elemento que creas lleva un 'id' corto que tú eliges (ej. 'fotosintesis', 'clorofila'). Reutiliza esos ids para conectarlos, resaltarlos o revelar quizzes.
 
-Ejemplos de Mermaid válido y simple:
+Cómo enseñar bien:
+1. Crea recursos con la herramienta adecuada:
+   - crear_tarjeta: definiciones, ideas clave, listas (LaTeX inline con $...$).
+   - crear_formula: cuando una fórmula sea el protagonista (se muestra grande).
+   - crear_diagrama: procesos, ciclos, jerarquías (Mermaid).
+   - crear_grafico: datos, cantidades, comparaciones.
+   - crear_dibujo: ilustrar objetos o escenas con SVG.
+2. CONECTA las ideas: usa 'conectar' para enlazar elementos relacionados y formar un mapa conceptual (ej. conectar 'sol' con 'evaporacion' con etiqueta 'provoca'). No dejes los recursos sueltos; muestra cómo se relacionan.
+3. SEÑALA mientras hablas: cuando te refieras a un elemento ya creado, llama a 'resaltar' con su id para que la cámara se centre en él, como apuntar a la pizarra.
+4. COMPRUEBA la comprensión: de vez en cuando usa 'crear_quiz' con una pregunta de opción múltiple, pregúntasela al estudiante EN VOZ ALTA y espera su respuesta hablada. Cuando responda, llama a 'revelar_respuesta' con el id del quiz y dale feedback breve (acertó o no, y por qué).
+5. Habla de forma cálida, clara y BREVE (1-2 frases por turno). El detalle va en el canvas, no en tu voz.
+6. Si el estudiante no propone tema, pregúntale qué quiere aprender y a qué nivel.
+
+Ejemplo de Mermaid válido:
 flowchart TD
   A[Sol] --> B[Evaporacion]
   B --> C[Condensacion]
   C --> D[Precipitacion]
-  D --> A
 
-mindmap
-  root((Fotosintesis))
-    Luz solar
-    Agua
-    Dioxido de carbono
-    Glucosa
-
-Mantén las etiquetas de Mermaid cortas y sin tildes ni símbolos raros para evitar errores de sintaxis.`;
+Mantén las etiquetas de Mermaid cortas y sin tildes.`;
 
 export function createTutorAgent() {
   return new RealtimeAgent({
     name: "Tutor",
     voice: "marin",
     instructions: INSTRUCTIONS,
-    tools: [crearTarjeta, crearDiagrama, crearGrafico, limpiarCanvas],
+    tools: [
+      crearTarjeta,
+      crearFormula,
+      crearDiagrama,
+      crearGrafico,
+      crearDibujo,
+      crearQuiz,
+      revelarRespuesta,
+      conectar,
+      resaltar,
+      limpiarCanvas,
+    ],
   });
 }
