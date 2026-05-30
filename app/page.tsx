@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AccountBar } from "@/components/AccountBar";
 import { ApiKeyGate } from "@/components/ApiKeyGate";
 import { Canvas } from "@/components/Canvas";
 import { DepthBreadcrumb } from "@/components/DepthBreadcrumb";
@@ -85,6 +86,7 @@ export default function Home() {
               Limpiar
             </button>
           )}
+          <AccountBar />
         </div>
       </header>
 

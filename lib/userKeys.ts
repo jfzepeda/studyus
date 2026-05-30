@@ -1,7 +1,8 @@
 // Almacenamiento de las API keys que el usuario trae (BYOK).
-// La key vive SOLO en el navegador del usuario: intentamos localStorage y,
-// si el navegador lo bloquea (incógnito endurecido / storage deshabilitado),
-// caemos a una variable en memoria para no romper la app.
+// La key vive SOLO en el navegador del usuario: usamos sessionStorage (se borra
+// al cerrar la pestaña, más seguro que persistirla) y, si el navegador lo bloquea
+// (incógnito endurecido / storage deshabilitado), caemos a una variable en memoria
+// para no romper la app.
 
 const OPENAI_KEY = "cqh:openai_key";
 const ANTHROPIC_KEY = "cqh:anthropic_key";

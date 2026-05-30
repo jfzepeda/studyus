@@ -132,9 +132,19 @@ interface CanvasState {
   cameraTarget: CameraTarget;
   /** Se incrementa para disparar el movimiento de cámara descrito en `cameraTarget`. */
   cameraTick: number;
+  /** Id del mapa guardado en Supabase que está abierto (null = sin guardar). */
+  savedMapId: string | null;
+  /** Título del mapa guardado abierto (para re-guardar sin volver a pedirlo). */
+  savedTitle: string | null;
 
-  /** Carga un conjunto completo de elementos y aristas (p. ej. una lección de ejemplo). */
-  load: (elements: CanvasElement[], edges: CanvasEdge[]) => void;
+  /** Carga un conjunto completo de elementos, aristas y aclaraciones (ejemplo o mapa guardado). */
+  load: (
+    elements: CanvasElement[],
+    edges: CanvasEdge[],
+    clarifications?: Record<string, Clarification[]>,
+  ) => void;
+  /** Marca qué mapa guardado está abierto (lo usa el panel "Mis mapas"). */
+  setSavedMap: (id: string | null, title: string | null) => void;
   /** Inserta o reemplaza (por id) un elemento del canvas. */
   upsertElement: (el: CanvasElement) => void;
   /** Conecta dos elementos existentes con una arista etiquetada. */
@@ -180,17 +190,21 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   version: 0,
   cameraTarget: { kind: "overview" },
   cameraTick: 0,
+  savedMapId: null,
+  savedTitle: null,
 
-  load: (elements, edges) =>
+  load: (elements, edges, clarifications = {}) =>
     set((state) => ({
       elements,
       edges,
-      clarifications: {},
+      clarifications,
       highlightedId: null,
       activeParentId: null,
       cameraTarget: { kind: "overview" },
       version: state.version + 1,
     })),
+
+  setSavedMap: (savedMapId, savedTitle) => set({ savedMapId, savedTitle }),
 
   upsertElement: (el) =>
     set((state) => {
@@ -363,6 +377,8 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       activeParentId: null,
       cameraTarget: { kind: "overview" },
       version: state.version + 1,
+      savedMapId: null,
+      savedTitle: null,
     })),
 }));
 
