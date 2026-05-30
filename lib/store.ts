@@ -81,11 +81,21 @@ export type CanvasEdge = {
   label: string;
 };
 
+/** Aclaración ligera (helper-text) anclada a un elemento existente del canvas. */
+export type Clarification = {
+  id: string;
+  termino: string;
+  definicion: string;
+};
+
 let edgeCounter = 0;
+let clarCounter = 0;
 
 interface CanvasState {
   elements: CanvasElement[];
   edges: CanvasEdge[];
+  /** Aclaraciones tipo helper-text, agrupadas por id del elemento al que se anclan. */
+  clarifications: Record<string, Clarification[]>;
   highlightedId: string | null;
   /** Tema en el que el usuario "entró" (vista de detalle), o null en la vista general. */
   activeParentId: string | null;
@@ -102,6 +112,11 @@ interface CanvasState {
   upsertElement: (el: CanvasElement) => void;
   /** Conecta dos elementos existentes con una arista etiquetada. */
   connect: (source: string, target: string, label: string) => void;
+  /**
+   * Ancla una aclaración (helper-text) a un elemento existente. Devuelve `false`
+   * si el elemento destino no existe.
+   */
+  addClarification: (targetId: string, termino: string, definicion: string) => boolean;
   /** Resalta un elemento y mueve la cámara hacia él (lo usa la herramienta `resaltar`). */
   highlightNode: (id: string) => void;
   /** Entra (zoom) dentro de un tema: anida ahí lo nuevo y vuela la cámara a su interior. */
@@ -116,6 +131,7 @@ interface CanvasState {
 export const useCanvasStore = create<CanvasState>((set) => ({
   elements: [],
   edges: [],
+  clarifications: {},
   highlightedId: null,
   activeParentId: null,
   version: 0,
@@ -126,6 +142,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     set((state) => ({
       elements,
       edges,
+      clarifications: {},
       highlightedId: null,
       activeParentId: null,
       cameraTarget: { kind: "overview" },
@@ -167,6 +184,24 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       return { edges: [...state.edges, edge], version: state.version + 1 };
     }),
 
+  addClarification: (targetId, termino, definicion) => {
+    let ok = false;
+    set((state) => {
+      if (!state.elements.some((e) => e.id === targetId)) return state;
+      ok = true;
+      clarCounter += 1;
+      const nueva: Clarification = { id: `clar-${clarCounter}`, termino, definicion };
+      const prev = state.clarifications[targetId] ?? [];
+      return {
+        clarifications: { ...state.clarifications, [targetId]: [...prev, nueva] },
+        highlightedId: targetId,
+        cameraTarget: { kind: "node", id: targetId },
+        cameraTick: state.cameraTick + 1,
+      };
+    });
+    return ok;
+  },
+
   highlightNode: (id) =>
     set((state) => ({
       highlightedId: id,
@@ -206,6 +241,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     set((state) => ({
       elements: [],
       edges: [],
+      clarifications: {},
       highlightedId: null,
       activeParentId: null,
       cameraTarget: { kind: "overview" },

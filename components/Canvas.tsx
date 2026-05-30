@@ -35,6 +35,7 @@ import {
   NODE_W,
   layoutWorld,
 } from "@/lib/layout";
+import { ClarificationBadge } from "./ClarificationBadge";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { CardRenderer } from "./renderers/CardRenderer";
 import { ChartRenderer } from "./renderers/ChartRenderer";
@@ -90,6 +91,7 @@ type AppNode = ResourceNode | ContainerNode;
 function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   const highlighted = useCanvasStore((s) => s.highlightedId === id);
   const { zoom } = useViewport();
+  const clarifications = useCanvasStore((s) => s.clarifications[id]);
   const el = data.el;
   // Los temas de nivel 0 siempre se ven completos (idéntico a antes). Solo los hijos
   // anidados usan LOD: muestran un placeholder barato mientras son diminutos en pantalla.
@@ -97,12 +99,19 @@ function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   return (
     <div
       style={{ width: NODE_W }}
-      className={`rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
+      className={`relative rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
         highlighted
           ? "border-indigo-400 ring-2 ring-indigo-400/70 shadow-indigo-500/30"
           : "border-white/10"
       }`}
     >
+      {clarifications && clarifications.length > 0 && (
+        <div className="absolute -right-2 -top-2 z-20 flex flex-row-reverse gap-1">
+          {clarifications.map((c) => (
+            <ClarificationBadge key={c.id} termino={c.termino} definicion={c.definicion} />
+          ))}
+        </div>
+      )}
       <Handle type="target" position={Position.Top} className="!bg-indigo-400/40" />
       <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-300">
         {el.titulo}
