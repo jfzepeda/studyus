@@ -219,6 +219,126 @@ const revelarRespuesta = tool({
   },
 });
 
+const crearTabla = tool({
+  name: "crear_tabla",
+  description:
+    "Crea una tabla de datos (filas y columnas). El estudiante PUEDE editar los valores y tiene un botón de reset para volver a tu generación inicial. Úsala para comparativas, matrices, tablas de verdad o datos por categorías.",
+  parameters: z.object({
+    id: idField,
+    titulo: z.string().describe("Título corto de la tabla."),
+    columnas: z.array(z.string()).describe("Encabezados de columna (uno por columna)."),
+    filas: z
+      .array(z.array(z.string()))
+      .describe(
+        "Filas de la tabla; cada fila es un arreglo de celdas (texto). Cada fila debe tener tantas celdas como columnas.",
+      ),
+    editable: z
+      .boolean()
+      .optional()
+      .describe("Si el estudiante puede editar las celdas. Por defecto true."),
+  }),
+  execute: async ({ id, titulo, columnas, filas, editable }) => {
+    useCanvasStore.getState().upsertElement({
+      id,
+      kind: "table",
+      titulo,
+      headers: columnas,
+      rows: filas,
+      initialRows: filas.map((f) => [...f]),
+      editable: editable ?? true,
+      highlights: [],
+      flashCells: [],
+      flashTick: 0,
+      op: null,
+      opTick: 0,
+    });
+    return `Tabla creada (id: ${id}).`;
+  },
+});
+
+const resaltarTabla = tool({
+  name: "resaltar_tabla",
+  description:
+    "Resalta filas, columnas o celdas de una tabla MIENTRAS explicas, para guiar la mirada paso a paso (como apuntar a la pizarra). Llama de nuevo con otros resaltados para avanzar, o con una lista vacía para quitar el resaltado.",
+  parameters: z.object({
+    id: z.string().describe("El id de la tabla."),
+    resaltados: z
+      .array(
+        z.object({
+          tipo: z.enum(["fila", "columna", "celda"]).describe("Qué resaltar."),
+          fila: z
+            .number()
+            .int()
+            .optional()
+            .describe("Índice de fila (0-based) para tipo 'fila' o 'celda'."),
+          columna: z
+            .number()
+            .int()
+            .optional()
+            .describe("Índice de columna (0-based) para tipo 'columna' o 'celda'."),
+          color: z
+            .enum(["amber", "blue", "gray", "green", "rose"])
+            .optional()
+            .describe("Color del resaltado. Por defecto amber."),
+        }),
+      )
+      .describe("Lista de resaltados activos. Vacía = quitar todo resaltado."),
+  }),
+  execute: async ({ id, resaltados }) => {
+    useCanvasStore.getState().highlightTable(
+      id,
+      resaltados.map((r) => ({
+        tipo: r.tipo,
+        fila: r.fila,
+        columna: r.columna,
+        color: r.color ?? "amber",
+      })),
+    );
+    return "Tabla resaltada.";
+  },
+});
+
+const actualizarCeldaTabla = tool({
+  name: "actualizar_celda_tabla",
+  description:
+    "Cambia uno o más valores de una tabla con una animación de parpadeo. Úsalo para llenar la tabla paso a paso o mostrar el resultado de un cálculo. No afecta el botón de reset (sigue volviendo a tu generación inicial).",
+  parameters: z.object({
+    id: z.string().describe("El id de la tabla."),
+    cambios: z
+      .array(
+        z.object({
+          fila: z.number().int().describe("Índice de fila (0-based)."),
+          columna: z.number().int().describe("Índice de columna (0-based)."),
+          valor: z.string().describe("Nuevo valor de la celda (texto)."),
+        }),
+      )
+      .describe("Celdas a actualizar."),
+  }),
+  execute: async ({ id, cambios }) => {
+    useCanvasStore.getState().setTableCells(id, cambios);
+    return "Celdas actualizadas.";
+  },
+});
+
+const operarFilasTool = tool({
+  name: "operar_filas",
+  description:
+    "Anima una operación entre dos filas: la fila ORIGEN se desliza visualmente sobre la DESTINO y la destino se actualiza con los valores resultantes. Para mostrar combinaciones o eliminación de filas (p. ej. F2 ← F2 − 2·F1).",
+  parameters: z.object({
+    id: z.string().describe("El id de la tabla."),
+    origen: z.number().int().describe("Índice (0-based) de la fila que se desliza."),
+    destino: z.number().int().describe("Índice (0-based) de la fila que se actualiza."),
+    etiqueta: z.string().describe("Descripción de la operación, p. ej. 'F2 ← F2 − 2·F1'."),
+    nuevos_valores: z
+      .array(z.string())
+      .describe("La fila destino completa tras la operación (una celda por columna)."),
+  }),
+  execute: async ({ id, origen, destino, etiqueta, nuevos_valores }) => {
+    useCanvasStore.getState().operarFilas(id, origen, destino, etiqueta, nuevos_valores);
+    return "Operación entre filas animada.";
+  },
+});
+
 const conectar = tool({
   name: "conectar",
   description:
@@ -328,11 +448,13 @@ Cómo enseñar bien:
    - crear_formula: cuando una fórmula sea el protagonista (se muestra grande).
    - crear_diagrama: procesos, ciclos, jerarquías (Mermaid).
    - crear_grafico: datos, cantidades, comparaciones.
+   - crear_tabla: datos tabulares, comparativas, matrices o tablas de verdad. El estudiante puede EDITAR los valores y tiene un botón de reset para volver a tu versión inicial.
    - crear_dibujo: DIAGRAMA/esquema vectorial rotulado (SVG), ideal para partes etiquetadas (célula con organelos, capas de la atmósfera, el ojo). Descríbelo con detalle; un especialista lo dibuja.
    - generar_imagen: IMAGEN realista o artística (animal, paisaje, planeta, obra de arte) cuando una ilustración realista enseña mejor que un esquema.
    - aclarar_concepto: para una DUDA RÁPIDA sobre un término (ej. '¿qué es H2O?'), NO crees una tarjeta nueva: ancla una aclaración ligera (popup) a un elemento que YA exista en el canvas. Reserva crear_tarjeta para ideas que merezcan su propio nodo en el mapa.
 2. CONECTA las ideas: usa 'conectar' para enlazar elementos relacionados y formar un mapa conceptual (ej. conectar 'sol' con 'evaporacion' con etiqueta 'provoca'). No dejes los recursos sueltos; muestra cómo se relacionan.
 3. SEÑALA mientras hablas: cuando te refieras a un elemento ya creado, llama a 'resaltar' con su id para que la cámara se centre en él, como apuntar a la pizarra.
+   - Con TABLAS, anímalas paso a paso mientras explicas: 'resaltar_tabla' para destacar filas/columnas/celdas (avanza llamándola de nuevo; lista vacía para limpiar), 'actualizar_celda_tabla' para rellenar o corregir valores con parpadeo, y 'operar_filas' para mostrar una operación entre filas (la origen se desliza sobre la destino). Usa los índices 0-based.
 4. COMPRUEBA la comprensión: de vez en cuando usa 'crear_quiz' con una pregunta de opción múltiple, pregúntasela al estudiante EN VOZ ALTA y espera su respuesta hablada. Cuando responda, llama a 'revelar_respuesta' con el id del quiz y dale feedback breve (acertó o no, y por qué).
 5. Habla de forma cálida, clara y BREVE (1-2 frases por turno). El detalle va en el canvas, no en tu voz.
 6. Si el estudiante no propone tema, pregúntale qué quiere aprender y a qué nivel.
@@ -361,6 +483,10 @@ export function createTutorAgent() {
       generarImagen,
       crearQuiz,
       revelarRespuesta,
+      crearTabla,
+      resaltarTabla,
+      actualizarCeldaTabla,
+      operarFilasTool,
       conectar,
       resaltar,
       profundizar,

@@ -44,6 +44,13 @@ import { DrawingRenderer } from "./renderers/DrawingRenderer";
 import { FormulaRenderer } from "./renderers/FormulaRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
 import { QuizRenderer } from "./renderers/QuizRenderer";
+import { TableRenderer } from "./renderers/TableRenderer";
+
+const TABLE_NODE_W = 560;
+
+function widthForKind(el: CanvasElement) {
+  return el.kind === "table" ? TABLE_NODE_W : NODE_W;
+}
 
 function renderBody(el: CanvasElement) {
   switch (el.kind) {
@@ -61,6 +68,8 @@ function renderBody(el: CanvasElement) {
       return <ImageRenderer src={el.src} titulo={el.titulo} loading={el.loading} />;
     case "quiz":
       return <QuizRenderer quiz={el} />;
+    case "table":
+      return <TableRenderer table={el} />;
   }
 }
 
@@ -72,6 +81,7 @@ const KIND_LABEL: Record<CanvasElement["kind"], string> = {
   drawing: "Esquema",
   image: "Imagen",
   quiz: "Quiz",
+  table: "Tabla",
 };
 
 // Placeholder barato para LOD: evita montar Mermaid/Recharts/imágenes cuando el nodo es diminuto en pantalla.
@@ -98,7 +108,7 @@ function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   const full = el.parentId == null || NODE_W * zoom >= LOD_FULL_PX;
   return (
     <div
-      style={{ width: NODE_W }}
+      style={{ width: widthForKind(el) }}
       className={`relative rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
         highlighted
           ? "border-indigo-400 ring-2 ring-indigo-400/70 shadow-indigo-500/30"
