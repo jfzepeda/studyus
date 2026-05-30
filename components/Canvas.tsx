@@ -19,21 +19,15 @@ import {
   useViewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { childrenOf, useCanvasStore, type CanvasElement } from "@/lib/store";
 import {
-  childrenOf,
-  isContainer,
-  useCanvasStore,
-  type CanvasElement,
-} from "@/lib/store";
-import {
-  COVER_H,
-  EMPTY_H,
-  EMPTY_W,
   ENTER_MAXZOOM,
   FALLBACK_H,
   LOD_FULL_PX,
   NODE_W,
   layoutWorld,
+  widthForKind,
+  type Measured,
 } from "@/lib/layout";
 import { ClarificationBadge } from "./ClarificationBadge";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -45,12 +39,6 @@ import { FormulaRenderer } from "./renderers/FormulaRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
 import { QuizRenderer } from "./renderers/QuizRenderer";
 import { TableRenderer } from "./renderers/TableRenderer";
-
-const TABLE_NODE_W = 560;
-
-function widthForKind(el: CanvasElement) {
-  return el.kind === "table" ? TABLE_NODE_W : NODE_W;
-}
 
 function renderBody(el: CanvasElement) {
   switch (el.kind) {
@@ -95,16 +83,19 @@ function ResourcePlaceholder({ kind }: { kind: CanvasElement["kind"] }) {
 
 type ResourceNodeData = { el: CanvasElement };
 type ResourceNode = Node<ResourceNodeData, "resource">;
-type ContainerNode = Node<ResourceNodeData, "container">;
-type AppNode = ResourceNode | ContainerNode;
+type AppNode = ResourceNode;
 
 function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   const highlighted = useCanvasStore((s) => s.highlightedId === id);
+  // Un tema (nivel 0) con detalles colgando recibe un acento sutil + eyebrow "Tema".
+  const isTopicWithKids = useCanvasStore(
+    (s) => data.el.parentId == null && s.elements.some((e) => e.parentId === id),
+  );
   const { zoom } = useViewport();
   const clarifications = useCanvasStore((s) => s.clarifications[id]);
   const el = data.el;
-  // Los temas de nivel 0 siempre se ven completos (idéntico a antes). Solo los hijos
-  // anidados usan LOD: muestran un placeholder barato mientras son diminutos en pantalla.
+  // Los temas de nivel 0 siempre se ven completos. Solo los detalles anidados usan LOD:
+  // muestran un placeholder barato mientras son diminutos en pantalla.
   const full = el.parentId == null || NODE_W * zoom >= LOD_FULL_PX;
   return (
     <div
@@ -112,7 +103,9 @@ function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
       className={`relative rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
         highlighted
           ? "border-indigo-400 ring-2 ring-indigo-400/70 shadow-indigo-500/30"
-          : "border-white/10"
+          : isTopicWithKids
+            ? "border-indigo-400/40"
+            : "border-white/10"
       }`}
     >
       {clarifications && clarifications.length > 0 && (
@@ -123,6 +116,11 @@ function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
         </div>
       )}
       <Handle type="target" position={Position.Top} className="!bg-indigo-400/40" />
+      {isTopicWithKids && (
+        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.3em] text-indigo-300/50">
+          Tema
+        </span>
+      )}
       <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-300">
         {el.titulo}
       </h3>
@@ -136,54 +134,7 @@ function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   );
 }
 
-// Contenedor de un tema: marco grande con una banda de título enorme (legible al alejarse).
-// Sus hijos son nodos React Flow aparte, anidados vía parentId, así que aquí no se dibuja cuerpo.
-function ContainerNode({ data, width, height }: NodeProps<ContainerNode>) {
-  const el = data.el;
-  const w = width ?? EMPTY_W;
-  const h = height ?? EMPTY_H;
-  return (
-    <div
-      style={{ width: w, height: h }}
-      className="rounded-[2.5rem] border-2 border-indigo-400/25 bg-indigo-500/[0.04] shadow-2xl shadow-black/40 backdrop-blur-sm"
-    >
-      <Handle type="target" position={Position.Top} className="!bg-indigo-400/40" />
-      <div
-        style={{ height: COVER_H }}
-        className="flex flex-col justify-center gap-3 border-b border-white/10 px-12"
-      >
-        <span
-          style={{ fontSize: COVER_H * 0.14 }}
-          className="font-semibold uppercase tracking-[0.3em] text-indigo-300/60"
-        >
-          Tema
-        </span>
-        <h2
-          style={{ fontSize: COVER_H * 0.42, lineHeight: 1.02 }}
-          className="font-bold tracking-tight text-indigo-50"
-        >
-          {el.titulo}
-        </h2>
-      </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-indigo-400/40" />
-    </div>
-  );
-}
-
-const nodeTypes = { resource: ResourceNode, container: ContainerNode };
-
-// Ordena los elementos para que cada tema (padre) aparezca antes que sus hijos: requisito de React Flow.
-function orderParentsFirst(els: CanvasElement[]): CanvasElement[] {
-  const topics = els.filter((e) => e.parentId == null);
-  const topicIds = new Set(topics.map((t) => t.id));
-  const out: CanvasElement[] = [];
-  for (const t of topics) {
-    out.push(t);
-    for (const c of els) if (c.parentId === t.id) out.push(c);
-  }
-  for (const e of els) if (e.parentId != null && !topicIds.has(e.parentId)) out.push(e);
-  return out;
-}
+const nodeTypes = { resource: ResourceNode };
 
 function Flow() {
   const storeElements = useCanvasStore((s) => s.elements);
@@ -197,8 +148,13 @@ function Flow() {
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNode, setCenter } = useReactFlow();
   const layoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Caché monótona de la altura del cuerpo completo por nodo. El layout la usa para que el
+  // LOD (placeholder corto al alejar) y el contenido async no encojan la geometría (RC-A/RC-B).
+  const fullHeight = useRef<Map<string, number>>(new Map());
+  // Solo movemos la cámara en cambios estructurales, no en re-layouts por crecimiento async.
+  const lastFitVersion = useRef<number>(-1);
 
-  // Centra la cámara en un nodo por su posición ABSOLUTA (suma la del padre si está anidado).
+  // Centra la cámara en un nodo por su posición absoluta (ya no hay anidamiento de RF).
   // Reintenta unos frames por si el nodo aún no fue confirmado por React Flow (recién creado).
   const flyToNode = useCallback(
     (id: string, zoom: number) => {
@@ -209,38 +165,34 @@ function Flow() {
           if (tries++ < 8) requestAnimationFrame(attempt);
           return;
         }
-        const base = n.parentId ? getNode(n.parentId) : null;
-        const ax = (base?.position.x ?? 0) + n.position.x;
-        const ay = (base?.position.y ?? 0) + n.position.y;
         const w = n.measured?.width ?? n.width ?? NODE_W;
         const h = n.measured?.height ?? n.height ?? FALLBACK_H;
-        setCenter(ax + w / 2, ay + h / 2, { zoom, duration: 600 });
+        setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom, duration: 600 });
       };
       attempt();
     },
     [getNode, setCenter],
   );
 
-  // Sincroniza nodos/aristas desde el store, preservando posiciones/medidas/tamaños ya calculados.
+  // Sincroniza nodos/aristas desde el store, preservando posiciones/medidas/estilo ya calculados.
   useEffect(() => {
     setNodes((prev) => {
       const byId = new Map(prev.map((n) => [n.id, n]));
-      return orderParentsFirst(storeElements).map((el) => {
+      return storeElements.map((el) => {
         const existing = byId.get(el.id);
-        const base = {
+        // Siembra el nodo nuevo cerca de su padre (no en (0,0)) para que durante la generación
+        // en vivo brote de su tema y no se apile en el origen mientras corre el layout (RC-D).
+        const parent = el.parentId ? byId.get(el.parentId) : undefined;
+        const seed = parent
+          ? { x: parent.position.x, y: parent.position.y + 160 }
+          : { x: 0, y: 0 };
+        return {
           id: el.id,
-          position: existing?.position ?? { x: 0, y: 0 },
+          type: "resource" as const,
+          position: existing?.position ?? seed,
           data: { el },
           measured: existing?.measured,
-          width: existing?.width,
-          height: existing?.height,
-          ...(el.parentId ? { parentId: el.parentId, extent: "parent" as const } : {}),
-        };
-        return (
-          isContainer(storeElements, el.id)
-            ? { ...base, type: "container" as const }
-            : { ...base, type: "resource" as const }
-        ) as AppNode;
+        } as AppNode;
       });
     });
     setEdges(
@@ -248,7 +200,7 @@ function Flow() {
         id: e.id,
         source: e.source,
         target: e.target,
-        label: e.label,
+        ...(e.label ? { label: e.label } : {}),
         animated: true,
         markerEnd: { type: MarkerType.ArrowClosed, color: "#818cf8" },
         style: { stroke: "#818cf8", strokeWidth: 1.5 },
@@ -260,44 +212,67 @@ function Flow() {
     );
   }, [storeElements, storeEdges, setNodes, setEdges]);
 
-  // Re-layout de dos niveles al cambiar la estructura. Debounced para coalescer ráfagas de upsert
-  // durante la generación en vivo. Mientras hay un tema activo, no se hace el fit global.
+  // Firma de las alturas medidas: cambia cuando el contenido async (Mermaid/charts/KaTeX/
+  // imágenes) crece tras montarse, para re-disparar el layout (RC-B).
+  const measureSig = nodes.map((n) => Math.round(n.measured?.height ?? 0)).join(",");
+
+  // Re-layout de un nivel al cambiar la estructura o las medidas. COALESCENTE: si ya hay un
+  // layout agendado, no se reinicia el timer. Así, el contenido que mide de forma inestable
+  // (p. ej. charts cuyo ResponsiveContainer no se asienta) no puede "starvar" el layout y
+  // dejar los nodos apilados en (0,0).
   useEffect(() => {
     if (!nodesInitialized || nodes.length === 0) return;
-    if (layoutTimer.current) clearTimeout(layoutTimer.current);
+    if (layoutTimer.current) return;
     layoutTimer.current = setTimeout(() => {
+      layoutTimer.current = null;
+      const { elements, edges } = useCanvasStore.getState();
       setNodes((curr) => {
-        const measuredById = new Map(curr.map((n) => [n.id, n.measured]));
-        const layout = layoutWorld(storeElements, storeEdges, measuredById);
+        const measuredById = new Map<string, Measured>();
+        for (const n of curr) {
+          const best = Math.max(n.measured?.height ?? 0, fullHeight.current.get(n.id) ?? 0);
+          if (best > 0) fullHeight.current.set(n.id, best);
+          measuredById.set(n.id, best > 0 ? { height: best } : undefined);
+        }
+        const layout = layoutWorld(elements, edges, measuredById);
         return curr.map((n) => {
           const r = layout.get(n.id);
-          if (!r) return n;
-          return {
-            ...n,
-            position: r.position,
-            ...(r.width != null ? { width: r.width, height: r.height } : {}),
-          };
+          return r ? { ...n, position: r.position } : n;
         });
       });
       requestAnimationFrame(() => {
+        // La cámara solo se mueve en cambios estructurales, no en re-layouts por medidas.
+        const v = useCanvasStore.getState().version;
+        const structural = v !== lastFitVersion.current;
+        lastFitVersion.current = v;
+        if (!structural) return;
         const apid = useCanvasStore.getState().activeParentId;
         if (apid) {
           const kids = childrenOf(useCanvasStore.getState().elements, apid).map((e) => ({
             id: e.id,
           }));
           if (kids.length) {
-            void fitView({ nodes: kids, padding: 0.3, duration: 300, maxZoom: ENTER_MAXZOOM });
+            void fitView({
+              nodes: [{ id: apid }, ...kids],
+              padding: 0.3,
+              duration: 300,
+              maxZoom: ENTER_MAXZOOM,
+            });
           }
         } else {
           void fitView({ padding: 0.25, duration: 450, maxZoom: 1.1 });
         }
       });
-    }, 120);
-    return () => {
-      if (layoutTimer.current) clearTimeout(layoutTimer.current);
-    };
+    }, 140);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, nodesInitialized]);
+  }, [version, nodesInitialized, measureSig]);
+
+  // Cancela un layout pendiente solo al desmontar (no en cada cambio de medida).
+  useEffect(
+    () => () => {
+      if (layoutTimer.current) clearTimeout(layoutTimer.current);
+    },
+    [],
+  );
 
   // Mueve la cámara según el objetivo del store (resaltar / profundizar / alejar).
   useEffect(() => {
@@ -312,14 +287,19 @@ function Flow() {
       return;
     }
     if (t.kind === "into") {
+      // "Vuela a la rama": encuadra el tema junto con sus detalles directos.
       const kids = childrenOf(storeElements, t.id).map((e) => ({ id: e.id }));
       if (kids.length === 0) {
-        flyToNode(t.id, 0.9); // tema aún vacío: solo céntralo; los hijos lo re-encuadran al aparecer
+        flyToNode(t.id, 0.9); // tema aún sin detalles: solo céntralo; al brotar lo re-encuadran
         return;
       }
-      // Movimiento Prezi: encuadra el contenedor un instante y luego vuela a sus hijos.
       void fitView({ nodes: [{ id: t.id }], duration: 300, maxZoom: 1.1 }).then(() =>
-        fitView({ nodes: kids, padding: 0.3, duration: 600, maxZoom: ENTER_MAXZOOM }),
+        fitView({
+          nodes: [{ id: t.id }, ...kids],
+          padding: 0.3,
+          duration: 600,
+          maxZoom: ENTER_MAXZOOM,
+        }),
       );
       return;
     }

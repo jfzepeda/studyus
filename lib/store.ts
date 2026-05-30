@@ -195,11 +195,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   upsertElement: (el) =>
     set((state) => {
       const idx = state.elements.findIndex((e) => e.id === el.id);
-      // Al insertar uno nuevo dentro de un tema activo, anídalo automáticamente.
-      const withParent =
-        idx < 0 && state.activeParentId && el.parentId == null
-          ? { ...el, parentId: state.activeParentId }
-          : el;
+      // Al insertar uno nuevo dentro de un tema activo, cuélgalo de él (puntero de árbol).
+      const attachParent =
+        idx < 0 && state.activeParentId && el.parentId == null ? state.activeParentId : null;
+      const withParent = attachParent ? { ...el, parentId: attachParent } : el;
       // Al reemplazar (p. ej. el re-upsert async de dibujo/imagen), conserva el padre previo.
       const next =
         idx >= 0
@@ -209,7 +208,17 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         idx >= 0
           ? state.elements.map((e, i) => (i === idx ? next : e))
           : [...state.elements, next];
-      return { elements, version: state.version + 1, highlightedId: el.id };
+      // El árbol crece: al colgar un detalle de un tema activo, crea la arista padre→hijo
+      // (sin etiqueta, fina) si no existe, para que dagre lo rankee debajo del tema.
+      let edges = state.edges;
+      if (attachParent && !edges.some((e) => e.source === attachParent && e.target === el.id)) {
+        edgeCounter += 1;
+        edges = [
+          ...edges,
+          { id: `edge-${edgeCounter}`, source: attachParent, target: el.id, label: "" },
+        ];
+      }
+      return { elements, edges, version: state.version + 1, highlightedId: el.id };
     }),
 
   connect: (source, target, label) =>
