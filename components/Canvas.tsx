@@ -20,6 +20,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCanvasStore, type CanvasElement } from "@/lib/store";
+import { ClarificationBadge } from "./ClarificationBadge";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { CardRenderer } from "./renderers/CardRenderer";
 import { ChartRenderer } from "./renderers/ChartRenderer";
@@ -56,16 +57,24 @@ type ResourceNode = Node<ResourceNodeData, "resource">;
 
 function ResourceNode({ id, data }: NodeProps<ResourceNode>) {
   const highlighted = useCanvasStore((s) => s.highlightedId === id);
+  const clarifications = useCanvasStore((s) => s.clarifications[id]);
   const el = data.el;
   return (
     <div
       style={{ width: NODE_W }}
-      className={`rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
+      className={`relative rounded-2xl border bg-slate-900/70 p-4 shadow-xl shadow-black/30 backdrop-blur transition ${
         highlighted
           ? "border-indigo-400 ring-2 ring-indigo-400/70 shadow-indigo-500/30"
           : "border-white/10"
       }`}
     >
+      {clarifications && clarifications.length > 0 && (
+        <div className="absolute -right-2 -top-2 z-20 flex flex-row-reverse gap-1">
+          {clarifications.map((c) => (
+            <ClarificationBadge key={c.id} termino={c.termino} definicion={c.definicion} />
+          ))}
+        </div>
+      )}
       <Handle type="target" position={Position.Top} className="!bg-indigo-400/40" />
       <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-300">
         {el.titulo}

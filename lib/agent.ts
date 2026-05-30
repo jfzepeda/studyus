@@ -249,6 +249,29 @@ const resaltar = tool({
   },
 });
 
+const aclararConcepto = tool({
+  name: "aclarar_concepto",
+  description:
+    "Aclara un concepto SIMPLE (la definición de un término en una sola frase) con un popup ligero tipo helper-text ANCLADO a un elemento que YA existe en el canvas, en vez de crear una tarjeta nueva. Úsalo para preguntas cortas como '¿qué es H2O?'. Aparece un ícono (i) en la esquina del elemento; el popup se muestra solo unos segundos y luego al pasar el cursor.",
+  parameters: z.object({
+    id_elemento: z
+      .string()
+      .describe(
+        "id de un elemento que YA existe en el canvas, al que se anclará la aclaración (la tarjeta, fórmula o diagrama más relacionado con el término).",
+      ),
+    termino: z.string().describe("El término o concepto, corto (ej. 'H2O')."),
+    definicion: z
+      .string()
+      .describe("Definición breve, una sola frase (ej. 'H2O es la fórmula del agua')."),
+  }),
+  execute: async ({ id_elemento, termino, definicion }) => {
+    const ok = useCanvasStore.getState().addClarification(id_elemento, termino, definicion);
+    return ok
+      ? `Aclaración de "${termino}" anclada al elemento ${id_elemento}.`
+      : `No existe el elemento ${id_elemento}. Crea o elige un elemento del canvas antes de aclarar.`;
+  },
+});
+
 const limpiarCanvas = tool({
   name: "limpiar_canvas",
   description: "Borra todos los elementos y conexiones del canvas.",
@@ -274,6 +297,7 @@ Cómo enseñar bien:
    - crear_grafico: datos, cantidades, comparaciones.
    - crear_dibujo: DIAGRAMA/esquema vectorial rotulado (SVG), ideal para partes etiquetadas (célula con organelos, capas de la atmósfera, el ojo). Descríbelo con detalle; un especialista lo dibuja.
    - generar_imagen: IMAGEN realista o artística (animal, paisaje, planeta, obra de arte) cuando una ilustración realista enseña mejor que un esquema.
+   - aclarar_concepto: para una DUDA RÁPIDA sobre un término (ej. '¿qué es H2O?'), NO crees una tarjeta nueva: ancla una aclaración ligera (popup) a un elemento que YA exista en el canvas. Reserva crear_tarjeta para ideas que merezcan su propio nodo en el mapa.
 2. CONECTA las ideas: usa 'conectar' para enlazar elementos relacionados y formar un mapa conceptual (ej. conectar 'sol' con 'evaporacion' con etiqueta 'provoca'). No dejes los recursos sueltos; muestra cómo se relacionan.
 3. SEÑALA mientras hablas: cuando te refieras a un elemento ya creado, llama a 'resaltar' con su id para que la cámara se centre en él, como apuntar a la pizarra.
 4. COMPRUEBA la comprensión: de vez en cuando usa 'crear_quiz' con una pregunta de opción múltiple, pregúntasela al estudiante EN VOZ ALTA y espera su respuesta hablada. Cuando responda, llama a 'revelar_respuesta' con el id del quiz y dale feedback breve (acertó o no, y por qué).
@@ -304,6 +328,7 @@ export function createTutorAgent() {
       revelarRespuesta,
       conectar,
       resaltar,
+      aclararConcepto,
       limpiarCanvas,
     ],
   });
