@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
+import { ApiKeyGate } from "@/components/ApiKeyGate";
 import { Canvas } from "@/components/Canvas";
 import { DepthBreadcrumb } from "@/components/DepthBreadcrumb";
 import { MicOrb } from "@/components/MicOrb";
@@ -7,6 +10,7 @@ import { MuteButton } from "@/components/MuteButton";
 import { Transcript } from "@/components/Transcript";
 import { useCanvasStore } from "@/lib/store";
 import { sampleLesson } from "@/lib/sampleLesson";
+import { hasOpenAIKey } from "@/lib/userKeys";
 import { useTutorSession } from "@/lib/useTutorSession";
 
 export default function Home() {
@@ -16,6 +20,12 @@ export default function Home() {
   const load = useCanvasStore((s) => s.load);
   const hasElements = useCanvasStore((s) => s.elements.length > 0);
   const sessionActive = status !== "idle" && status !== "connecting";
+
+  // Abrimos el gate al montar si el usuario aún no ingresó su key (solo cliente).
+  const [keyGateOpen, setKeyGateOpen] = useState(false);
+  useEffect(() => {
+    if (!hasOpenAIKey()) setKeyGateOpen(true);
+  }, []);
 
   return (
     <main className="mx-auto flex h-screen max-w-7xl flex-col overflow-hidden px-4 py-6">
@@ -31,6 +41,29 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <MicOrb status={status} onConnect={connect} onDisconnect={disconnect} />
           {sessionActive && <MuteButton muted={muted} onToggle={toggleMute} />}
+          <button
+            type="button"
+            onClick={() => setKeyGateOpen(true)}
+            title="API key"
+            aria-label="API key"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/10"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="7.5" cy="15.5" r="4.5" />
+              <path d="m10.7 12.3 8.3-8.3" />
+              <path d="m18 5 2 2" />
+              <path d="m15 8 2 2" />
+            </svg>
+          </button>
           <button
             type="button"
             onClick={() => load(sampleLesson.elements, sampleLesson.edges)}
@@ -64,6 +97,8 @@ export default function Home() {
         <DepthBreadcrumb />
         <Canvas />
       </section>
+
+      {keyGateOpen && <ApiKeyGate onClose={() => setKeyGateOpen(false)} />}
     </main>
   );
 }

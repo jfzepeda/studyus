@@ -6,6 +6,7 @@ import {
   ROW_OP_TOTAL_MS,
   HIGHLIGHT_HOLD_MS,
 } from "./animation";
+import { getAnthropicKey, getOpenAIKey } from "./userKeys";
 
 // Espera lo que dura la animación antes de devolver el output al modelo: el SDK
 // hace await del execute() de la tool antes de pedir la siguiente narración, así
@@ -122,7 +123,10 @@ const crearDibujo = tool({
     });
     void fetch("/api/draw", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-anthropic-key": getAnthropicKey() ?? "",
+      },
       body: JSON.stringify({ descripcion }),
     })
       .then(async (r) => {
@@ -164,7 +168,10 @@ const generarImagen = tool({
     });
     void fetch("/api/image", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-openai-key": getOpenAIKey() ?? "",
+      },
       body: JSON.stringify({ prompt }),
     })
       .then(async (r) => {

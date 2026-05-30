@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeItem, RealtimeSession } from "@openai/agents-realtime";
+import { getOpenAIKey } from "./userKeys";
 
 export type TutorStatus =
   | "idle"
@@ -38,11 +39,21 @@ export function useTutorSession() {
     setError(null);
     setStatus("connecting");
 
+    const userKey = getOpenAIKey();
+    if (!userKey) {
+      setError("Ingresa tu API key de OpenAI para comenzar.");
+      setStatus("idle");
+      return;
+    }
+
     try {
       const { RealtimeSession } = await import("@openai/agents-realtime");
       const { createTutorAgent } = await import("./agent");
 
-      const res = await fetch("/api/realtime-token", { method: "POST" });
+      const res = await fetch("/api/realtime-token", {
+        method: "POST",
+        headers: { "x-openai-key": userKey },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? "No se pudo obtener el token de sesión.");

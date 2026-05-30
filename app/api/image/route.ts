@@ -5,9 +5,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  // BYOK: key del usuario por header, con fallback al env del servidor.
+  const apiKey = req.headers.get("x-openai-key")?.trim() || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "Falta OPENAI_API_KEY." }, { status: 500 });
+    return NextResponse.json({ error: "Falta tu OpenAI API key." }, { status: 401 });
   }
 
   let prompt = "";

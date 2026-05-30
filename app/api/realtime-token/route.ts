@@ -5,12 +5,14 @@ export const dynamic = "force-dynamic";
 
 const MODEL = "gpt-realtime-2";
 
-export async function POST() {
-  const apiKey = process.env.OPENAI_API_KEY;
+export async function POST(req: Request) {
+  // La key del usuario (BYOK) llega por header; si no, caemos al env del servidor.
+  // No la logueamos ni la guardamos: solo se usa para acuñar el token efímero.
+  const apiKey = req.headers.get("x-openai-key")?.trim() || process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Falta OPENAI_API_KEY en el servidor." },
-      { status: 500 },
+      { error: "Falta tu OpenAI API key." },
+      { status: 401 },
     );
   }
 

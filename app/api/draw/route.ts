@@ -17,9 +17,10 @@ function extractText(data: unknown): string {
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // BYOK opcional: key de Anthropic del usuario por header, con fallback al env.
+  const apiKey = req.headers.get("x-anthropic-key")?.trim() || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "Falta ANTHROPIC_API_KEY." }, { status: 500 });
+    return NextResponse.json({ error: "Falta tu Anthropic API key." }, { status: 401 });
   }
 
   let descripcion = "";
