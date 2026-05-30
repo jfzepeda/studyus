@@ -16,9 +16,23 @@ function sanitizeSvg(raw: string): string {
     .replace(/javascript:/gi, "");
 }
 
-export function DrawingRenderer({ svg }: { svg: string }) {
-  const clean = sanitizeSvg(svg);
+export function DrawingRenderer({
+  svg,
+  loading,
+}: {
+  svg: string;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-lg bg-slate-800/40 text-sm text-slate-400">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-400" />
+        Dibujando…
+      </div>
+    );
+  }
 
+  const clean = sanitizeSvg(svg);
   if (!clean.toLowerCase().includes("<svg")) {
     return (
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">

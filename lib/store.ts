@@ -36,6 +36,15 @@ export type DrawingElement = {
   kind: "drawing";
   titulo: string;
   svg: string;
+  loading: boolean;
+};
+
+export type ImageElement = {
+  id: string;
+  kind: "image";
+  titulo: string;
+  src: string; // data URL; vacío mientras se genera
+  loading: boolean;
 };
 
 export type QuizElement = {
@@ -56,6 +65,7 @@ export type CanvasElement =
   | DiagramElement
   | ChartElement
   | DrawingElement
+  | ImageElement
   | QuizElement;
 
 export type CanvasEdge = {
@@ -76,6 +86,8 @@ interface CanvasState {
   /** Se incrementa cuando queremos que la cámara se centre en `highlightedId`. */
   focusTick: number;
 
+  /** Carga un conjunto completo de elementos y aristas (p. ej. una lección de ejemplo). */
+  load: (elements: CanvasElement[], edges: CanvasEdge[]) => void;
   /** Inserta o reemplaza (por id) un elemento del canvas. */
   upsertElement: (el: CanvasElement) => void;
   /** Conecta dos elementos existentes con una arista etiquetada. */
@@ -93,6 +105,14 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   highlightedId: null,
   version: 0,
   focusTick: 0,
+
+  load: (elements, edges) =>
+    set((state) => ({
+      elements,
+      edges,
+      highlightedId: null,
+      version: state.version + 1,
+    })),
 
   upsertElement: (el) =>
     set((state) => {

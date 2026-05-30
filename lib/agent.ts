@@ -92,19 +92,84 @@ const crearGrafico = tool({
 const crearDibujo = tool({
   name: "crear_dibujo",
   description:
-    "Dibuja una ilustración vectorial con SVG (el Sol, un átomo, una célula, figuras geométricas).",
+    "Crea un DIAGRAMA o esquema vectorial rotulado (SVG) a partir de una descripción. Ideal para esquemas con partes etiquetadas: una célula con sus organelos, las capas de la atmósfera, el ojo humano, un circuito. Un modelo especialista lo dibuja en unos segundos.",
   parameters: z.object({
     id: idField,
     titulo: z.string().describe("Título corto del dibujo."),
-    svg: z
+    descripcion: z
       .string()
       .describe(
-        "Código SVG completo desde <svg ...> hasta </svg>. Incluye SIEMPRE un viewBox, formas simples y colores vivos. Sin <script>.",
+        "Descripción detallada de QUÉ dibujar y qué partes rotular, en lenguaje natural. Ej: 'una célula animal mostrando núcleo, mitocondrias, membrana y citoplasma, cada parte etiquetada'.",
       ),
   }),
-  execute: async ({ id, titulo, svg }) => {
-    useCanvasStore.getState().upsertElement({ id, kind: "drawing", titulo, svg });
-    return `Dibujo creado (id: ${id}).`;
+  execute: async ({ id, titulo, descripcion }) => {
+    useCanvasStore.getState().upsertElement({
+      id,
+      kind: "drawing",
+      titulo,
+      svg: "",
+      loading: true,
+    });
+    void fetch("/api/draw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ descripcion }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("draw failed");
+        const { svg } = await r.json();
+        useCanvasStore
+          .getState()
+          .upsertElement({ id, kind: "drawing", titulo, svg: svg ?? "", loading: false });
+      })
+      .catch(() => {
+        useCanvasStore
+          .getState()
+          .upsertElement({ id, kind: "drawing", titulo, svg: "", loading: false });
+      });
+    return `Dibujando ${titulo}… aparecerá en el canvas en unos segundos.`;
+  },
+});
+
+const generarImagen = tool({
+  name: "generar_imagen",
+  description:
+    "Genera una IMAGEN realista o artística con un modelo de imágenes, a partir de un prompt. Ideal para cosas orgánicas, escenas o lugares donde una ilustración realista enseña mejor que un esquema: un animal, un paisaje, una obra de arte, un planeta. Tarda varios segundos.",
+  parameters: z.object({
+    id: idField,
+    titulo: z.string().describe("Título corto de la imagen."),
+    prompt: z
+      .string()
+      .describe(
+        "Descripción visual detallada de la imagen a generar (en español o inglés). Sé específico sobre estilo, composición y elementos.",
+      ),
+  }),
+  execute: async ({ id, titulo, prompt }) => {
+    useCanvasStore.getState().upsertElement({
+      id,
+      kind: "image",
+      titulo,
+      src: "",
+      loading: true,
+    });
+    void fetch("/api/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("image failed");
+        const { src } = await r.json();
+        useCanvasStore
+          .getState()
+          .upsertElement({ id, kind: "image", titulo, src: src ?? "", loading: false });
+      })
+      .catch(() => {
+        useCanvasStore
+          .getState()
+          .upsertElement({ id, kind: "image", titulo, src: "", loading: false });
+      });
+    return `Generando imagen de ${titulo}… aparecerá en unos segundos.`;
   },
 });
 
@@ -207,7 +272,8 @@ Cómo enseñar bien:
    - crear_formula: cuando una fórmula sea el protagonista (se muestra grande).
    - crear_diagrama: procesos, ciclos, jerarquías (Mermaid).
    - crear_grafico: datos, cantidades, comparaciones.
-   - crear_dibujo: ilustrar objetos o escenas con SVG.
+   - crear_dibujo: DIAGRAMA/esquema vectorial rotulado (SVG), ideal para partes etiquetadas (célula con organelos, capas de la atmósfera, el ojo). Descríbelo con detalle; un especialista lo dibuja.
+   - generar_imagen: IMAGEN realista o artística (animal, paisaje, planeta, obra de arte) cuando una ilustración realista enseña mejor que un esquema.
 2. CONECTA las ideas: usa 'conectar' para enlazar elementos relacionados y formar un mapa conceptual (ej. conectar 'sol' con 'evaporacion' con etiqueta 'provoca'). No dejes los recursos sueltos; muestra cómo se relacionan.
 3. SEÑALA mientras hablas: cuando te refieras a un elemento ya creado, llama a 'resaltar' con su id para que la cámara se centre en él, como apuntar a la pizarra.
 4. COMPRUEBA la comprensión: de vez en cuando usa 'crear_quiz' con una pregunta de opción múltiple, pregúntasela al estudiante EN VOZ ALTA y espera su respuesta hablada. Cuando responda, llama a 'revelar_respuesta' con el id del quiz y dale feedback breve (acertó o no, y por qué).
@@ -233,6 +299,7 @@ export function createTutorAgent() {
       crearDiagrama,
       crearGrafico,
       crearDibujo,
+      generarImagen,
       crearQuiz,
       revelarRespuesta,
       conectar,

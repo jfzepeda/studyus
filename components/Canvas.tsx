@@ -26,6 +26,7 @@ import { ChartRenderer } from "./renderers/ChartRenderer";
 import { DiagramRenderer } from "./renderers/DiagramRenderer";
 import { DrawingRenderer } from "./renderers/DrawingRenderer";
 import { FormulaRenderer } from "./renderers/FormulaRenderer";
+import { ImageRenderer } from "./renderers/ImageRenderer";
 import { QuizRenderer } from "./renderers/QuizRenderer";
 
 const NODE_W = 340;
@@ -42,7 +43,9 @@ function renderBody(el: CanvasElement) {
     case "chart":
       return <ChartRenderer tipo={el.tipo} data={el.data} />;
     case "drawing":
-      return <DrawingRenderer svg={el.svg} />;
+      return <DrawingRenderer svg={el.svg} loading={el.loading} />;
+    case "image":
+      return <ImageRenderer src={el.src} titulo={el.titulo} loading={el.loading} />;
     case "quiz":
       return <QuizRenderer quiz={el} />;
   }

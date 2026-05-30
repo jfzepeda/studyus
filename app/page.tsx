@@ -5,12 +5,14 @@ import { MicOrb } from "@/components/MicOrb";
 import { MuteButton } from "@/components/MuteButton";
 import { Transcript } from "@/components/Transcript";
 import { useCanvasStore } from "@/lib/store";
+import { sampleLesson } from "@/lib/sampleLesson";
 import { useTutorSession } from "@/lib/useTutorSession";
 
 export default function Home() {
   const { status, error, muted, transcript, connect, disconnect, toggleMute } =
     useTutorSession();
   const clear = useCanvasStore((s) => s.clear);
+  const load = useCanvasStore((s) => s.load);
   const hasElements = useCanvasStore((s) => s.elements.length > 0);
   const sessionActive = status !== "idle" && status !== "connecting";
 
@@ -25,9 +27,16 @@ export default function Home() {
             Háblale y aprende cualquier tema con recursos visuales en vivo.
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <MicOrb status={status} onConnect={connect} onDisconnect={disconnect} />
           {sessionActive && <MuteButton muted={muted} onToggle={toggleMute} />}
+          <button
+            type="button"
+            onClick={() => load(sampleLesson.elements, sampleLesson.edges)}
+            className="rounded-lg border border-indigo-400/30 bg-indigo-500/15 px-3 py-2 text-sm font-medium text-indigo-200 transition hover:bg-indigo-500/25"
+          >
+            Ver ejemplo
+          </button>
           {hasElements && (
             <button
               type="button"
